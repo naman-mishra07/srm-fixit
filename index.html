@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#123b78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRM-FixIt">
+<title>SRM-FixIt — Login</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h1>SRM-FixIt</h1>
+<p class="subtitle">Students, faculty, and staff: sign in with your college email and SRM-FixIt password.</p>
+
+<div class="card">
+  <div id="loginForm">
+    <label for="loginEmail">College email</label>
+    <input type="email" id="loginEmail" placeholder="you@srmist.edu.in" autocomplete="username">
+
+    <label for="loginPassword">Password</label>
+    <input type="password" id="loginPassword" autocomplete="current-password">
+
+    <button id="loginBtn">Log In</button>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<div class="card" id="roleChoice" hidden>
+  <h2 style="margin-top:0;">Choose your role</h2>
+  <p>Select the area you use in SRM-FixIt.</p>
+  <button id="studentRoleBtn">Student / Faculty</button>
+  <button id="staffRoleBtn" class="secondary">Admin / Maintenance Team</button>
+  <div id="roleMsg" aria-live="polite"></div>
+  <button id="switchAccountBtn" class="secondary">Log Out</button>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="pwa-install.js"></script>
+<script>
+const SRM_EMAIL_DOMAIN = "@srmist.edu.in";
+
+function isSrmEmail(email) {
+  return typeof email === "string" && email.trim().toLowerCase().endsWith(SRM_EMAIL_DOMAIN);
+}
+
+function showRoleChoice() {
+  document.getElementById("loginForm").parentElement.hidden = true;
+  document.getElementById("roleChoice").hidden = false;
+}
+
+async function prepareRoleChoice(user) {
+  if (!isSrmEmail(user.email)) {
+    await supabaseClient.auth.signOut();
+    document.getElementById("loginMsg").textContent = "Only SRM college email accounts can sign in.";
+    document.getElementById("loginMsg").className = "error";
+    return false;
+  }
+
+  const profile = await getMyProfile(user.id);
+  if (!profile || !["student", "admin", "maintenance_worker"].includes(profile.role)) {
+    await supabaseClient.auth.signOut();
+    document.getElementById("loginMsg").textContent = "This account is not enabled for SRM-FixIt. Contact the administrator.";
+    document.getElementById("loginMsg").className = "error";
+    return false;
+  }
+  showRoleChoice();
+  return true;
+}
+
+// Existing sessions go to the role selection screen too.
+(async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) await prepareRoleChoice(session.user);
+})();
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const msg = document.getElementById("loginMsg");
+  msg.textContent = "";
+
+  if (!email || !password) {
+    msg.textContent = "Enter email and password.";
+    msg.className = "error";
+    return;
+  }
+  if (!isSrmEmail(email)) {
+    msg.textContent = "Use your SRM college email address (@srmist.edu.in).";
+    msg.className = "error";
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    msg.textContent = error.message;
+    msg.className = "error";
+    return;
+  }
+
+  await prepareRoleChoice(data.user);
+});
+
+document.getElementById("studentRoleBtn").addEventListener("click", () => {
+  window.location.href = "student.html";
+});
+
+document.getElementById("staffRoleBtn").addEventListener("click", () => {
+  window.location.href = "staff-login.html";
+});
+
+document.getElementById("switchAccountBtn").addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  window.location.reload();
+});
+
+</script>
+
+</body>
+</html>

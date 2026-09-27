@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#123b78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRM-FixIt">
+<title>SRM-FixIt — My Tickets</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1 style="margin-bottom:0;">My Tickets</h1>
+  <button class="secondary" onclick="logout()">Log Out</button>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Report an Issue</h3>
+
+  <label for="category">Category</label>
+  <select id="category">
+    <option value="wifi">WiFi</option>
+    <option value="furniture">Furniture</option>
+    <option value="ac">AC</option>
+    <option value="electrical">Electrical</option>
+    <option value="smartboards_mics">Smartboards & Mics</option>
+    <option value="plumbing">Plumbing</option>
+    <option value="cleaning">Cleaning</option>
+  </select>
+
+  <label for="building">Building</label>
+  <input type="text" id="building" placeholder="e.g. Tech Park">
+
+  <label for="floor">Floor</label>
+  <input type="text" id="floor" placeholder="e.g. 3rd Floor">
+
+  <label>
+    <input type="checkbox" id="isCommonArea" style="width:auto; display:inline-block;">
+    This is a common area (corridor, washroom, lab, etc.)
+  </label>
+
+  <div id="roomWrapper">
+    <label for="roomNumber">Room Number</label>
+    <input type="text" id="roomNumber" placeholder="e.g. 304">
+  </div>
+
+  <label for="description">Description (optional)</label>
+  <textarea id="description" placeholder="Briefly describe the issue"></textarea>
+
+  <label for="photo">Photo</label>
+  <input type="file" id="photo" accept="image/jpeg,image/png,image/webp">
+
+  <button id="submitBtn">Submit Ticket</button>
+  <div id="submitMsg"></div>
+</div>
+
+<section class="updates-section" aria-labelledby="updatesHeading">
+  <h3 id="updatesHeading">Status Updates</h3>
+  <div id="statusUpdates" aria-live="polite">Loading updates...</div>
+</section>
+
+<h3>Status</h3>
+<div id="ticketList">Loading...</div>
+
+<script src="supabase-client.js"></script>
+<script src="pwa-install.js"></script>
+<script>
+let currentUserId = null;
+
+const categoryLabels = {
+  wifi: "WiFi", furniture: "Furniture", ac: "AC", electrical: "Electrical",
+  smartboards_mics: "Smartboards & Mics", plumbing: "Plumbing", cleaning: "Cleaning"
+};
+const statusLabels = {
+  open: "Open", in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected"
+};
+
+document.getElementById("isCommonArea").addEventListener("change", (e) => {
+  document.getElementById("roomWrapper").style.display = e.target.checked ? "none" : "block";
+});
+
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+  currentUserId = session.user.id;
+
+  await Promise.all([loadTickets(), loadStatusUpdates()]);
+}
+
+async function loadStatusUpdates() {
+  const updatesEl = document.getElementById("statusUpdates");
+  const { data, error } = await supabaseClient
+    .from("ticket_status_events")
+    .select("id, old_status, new_status, created_at, tickets(category, building, floor, room_number, is_common_area)")
+    .eq("student_id", currentUserId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    updatesEl.innerHTML = `<p class="error">Could not load updates: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  if (!data.length) {
+    updatesEl.innerHTML = `<p class="ticket-meta">No status updates yet.</p>`;
+    return;
+  }
+
+  updatesEl.innerHTML = data.map(event => {
+    const ticket = event.tickets;
+    const location = ticket
+      ? `${ticket.building}, ${ticket.floor}${ticket.is_common_area ? " (Common Area)" : `, Room ${ticket.room_number || "-"}`}`
+      : "Ticket";
+    return `
+      <article class="status-update">
+        <strong>${escapeHtml(categoryLabels[ticket?.category] || "Ticket")} status changed</strong>
+        <div class="ticket-meta">${escapeHtml(location)}</div>
+        <div class="ticket-meta">${statusLabels[event.old_status]} → ${statusLabels[event.new_status]}</div>
+        <div class="ticket-meta">${new Date(event.created_at).toLocaleString()}</div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadTickets() {
+  const listEl = document.getElementById("ticketList");
+  const { data, error } = await supabaseClient
+    .from("tickets")
+    .select("*")
+    .eq("student_id", currentUserId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    listEl.innerHTML = `<div class="error">Failed to load tickets: ${error.message}</div>`;
+    return;
+  }
+
+  if (!data.length) {
+    listEl.innerHTML = `<p style="color:#666;">No tickets yet. Submit one above.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = data.map(t => `
+    <div class="ticket">
+      <img src="${t.photo_url}" alt="ticket photo">
+      <div class="ticket-body">
+        <strong>${categoryLabels[t.category] || t.category}</strong>
+        <span class="badge badge-${t.status}">${statusLabels[t.status] || t.status}</span>
+        <div class="ticket-meta">${t.building}, ${t.floor}${t.is_common_area ? " (Common Area)" : ", Room " + (t.room_number || "-")}</div>
+        ${t.description ? `<div class="ticket-meta">${escapeHtml(t.description)}</div>` : ""}
+        <div class="ticket-meta">Submitted ${new Date(t.created_at).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById("submitBtn").addEventListener("click", async () => {
+  const category = document.getElementById("category").value;
+  const building = document.getElementById("building").value.trim();
+  const floor = document.getElementById("floor").value.trim();
+  const isCommonArea = document.getElementById("isCommonArea").checked;
+  const roomNumber = document.getElementById("roomNumber").value.trim();
+  const description = document.getElementById("description").value.trim();
+  const photoInput = document.getElementById("photo");
+  const msg = document.getElementById("submitMsg");
+  const btn = document.getElementById("submitBtn");
+
+  msg.textContent = "";
+
+  if (!building || !floor) {
+    msg.textContent = "Building and floor are required.";
+    msg.className = "error";
+    return;
+  }
+  if (!isCommonArea && !roomNumber) {
+    msg.textContent = "Room number is required unless this is a common area.";
+    msg.className = "error";
+    return;
+  }
+  if (!photoInput.files[0]) {
+    msg.textContent = "A photo is required.";
+    msg.className = "error";
+    return;
+  }
+
+  const file = photoInput.files[0];
+  const allowedPhotoTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedPhotoTypes.includes(file.type)) {
+    msg.textContent = "Choose a JPEG, PNG, or WebP image.";
+    msg.className = "error";
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    msg.textContent = "Photo must be under 5MB.";
+    msg.className = "error";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+
+  // Upload photo to storage first.
+  const filePath = `${currentUserId}/${Date.now()}_${file.name}`;
+  const { error: uploadError } = await supabaseClient.storage
+    .from("ticket-photos")
+    .upload(filePath, file);
+
+  if (uploadError) {
+    msg.textContent = `Photo upload failed: ${uploadError.message}`;
+    msg.className = "error";
+    btn.disabled = false;
+    btn.textContent = "Submit Ticket";
+    return;
+  }
+
+  const { data: urlData } = supabaseClient.storage
+    .from("ticket-photos")
+    .getPublicUrl(filePath);
+
+  const { error: insertError } = await supabaseClient.from("tickets").insert({
+    student_id: currentUserId,
+    photo_url: urlData.publicUrl,
+    category,
+    building,
+    floor,
+    is_common_area: isCommonArea,
+    room_number: isCommonArea ? null : roomNumber,
+    description: description || null
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Submit Ticket";
+
+  if (insertError) {
+    msg.textContent = `Failed to create ticket: ${insertError.message}`;
+    msg.className = "error";
+    return;
+  }
+
+  msg.textContent = "Ticket submitted.";
+  msg.className = "success";
+  document.getElementById("building").value = "";
+  document.getElementById("floor").value = "";
+  document.getElementById("roomNumber").value = "";
+  document.getElementById("description").value = "";
+  document.getElementById("isCommonArea").checked = false;
+  document.getElementById("roomWrapper").style.display = "block";
+  photoInput.value = "";
+
+  await loadTickets();
+});
+
+init();
+</script>
+
+</body>
+</html>

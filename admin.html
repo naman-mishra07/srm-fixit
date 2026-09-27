@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#123b78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRM-FixIt">
+<title>SRM-FixIt — Admin</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1 style="margin-bottom:0;">Admin Dashboard</h1>
+  <button class="secondary" onclick="logout()">Log Out</button>
+</div>
+
+<section class="card">
+  <h2 style="margin-top:0;">Ticket Analytics</h2>
+  <div id="analytics">Loading analytics...</div>
+</section>
+
+<div class="filters">
+  <select id="filterStatus">
+    <option value="">All Statuses</option>
+    <option value="open">Open</option>
+    <option value="in_progress">In Progress</option>
+    <option value="resolved">Resolved</option>
+    <option value="rejected">Rejected</option>
+  </select>
+
+  <select id="filterCategory">
+    <option value="">All Categories</option>
+    <option value="wifi">WiFi</option>
+    <option value="furniture">Furniture</option>
+    <option value="ac">AC</option>
+    <option value="electrical">Electrical</option>
+    <option value="smartboards_mics">Smartboards & Mics</option>
+    <option value="plumbing">Plumbing</option>
+    <option value="cleaning">Cleaning</option>
+  </select>
+
+  <select id="filterBuilding">
+    <option value="">All Buildings</option>
+  </select>
+</div>
+
+<div id="ticketList">Loading...</div>
+
+<script src="supabase-client.js"></script>
+<script src="pwa-install.js"></script>
+<script>
+const categoryLabels = {
+  wifi: "WiFi", furniture: "Furniture", ac: "AC", electrical: "Electrical",
+  smartboards_mics: "Smartboards & Mics", plumbing: "Plumbing", cleaning: "Cleaning"
+};
+const statusOptions = ["open", "in_progress", "resolved", "rejected"];
+const statusLabels = {
+  open: "Open", in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected"
+};
+
+let allTickets = [];
+let duplicateTicketCounts = new Map();
+let adminStaff = [];
+let profilesById = new Map();
+
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const profile = await getMyProfile(session.user.id);
+  if (!profile || profile.role !== "admin") {
+    // Not an admin — RLS would block their queries anyway, but bounce them cleanly.
+    window.location.href = "student.html";
+    return;
+  }
+  if (sessionStorage.getItem("srmFixitStaffReauth") !== session.user.id) {
+    window.location.href = "staff-login.html";
+    return;
+  }
+
+  await Promise.all([loadAdminStaff(), loadAnalytics()]);
+  await loadTickets();
+
+  document.getElementById("filterStatus").addEventListener("change", render);
+  document.getElementById("filterCategory").addEventListener("change", render);
+  document.getElementById("filterBuilding").addEventListener("change", render);
+}
+
+async function loadTickets() {
+  const { data, error } = await supabaseClient
+    .from("tickets")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  const listEl = document.getElementById("ticketList");
+  if (error) {
+    listEl.innerHTML = `<div class="error">Failed to load tickets: ${error.message}</div>`;
+    return;
+  }
+
+  allTickets = data;
+  await loadTicketProfiles(data);
+  populateBuildingFilter(data);
+  await loadDuplicateFlags();
+  render();
+}
+
+async function loadTicketProfiles(tickets) {
+  const profileIds = [...new Set(tickets.flatMap(ticket => [ticket.student_id, ticket.assigned_to]).filter(Boolean))];
+  profilesById = new Map();
+  if (!profileIds.length) return;
+
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", profileIds);
+  if (error) {
+    console.error("Could not load ticket profiles:", error.message);
+    return;
+  }
+  profilesById = new Map((data || []).map(profile => [profile.id, profile]));
+}
+
+async function loadAdminStaff() {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, full_name")
+    .eq("role", "admin")
+    .order("full_name");
+  if (error) {
+    console.error("Could not load admin staff:", error.message);
+    adminStaff = [];
+    return;
+  }
+  adminStaff = data || [];
+}
+
+async function loadAnalytics() {
+  const analyticsEl = document.getElementById("analytics");
+  const { data, error } = await supabaseClient.rpc("get_ticket_analytics");
+  if (error) {
+    analyticsEl.innerHTML = `<div class="error">Could not load analytics: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  if (!data.length) {
+    analyticsEl.innerHTML = `<p>No tickets to summarize yet.</p>`;
+    return;
+  }
+  analyticsEl.innerHTML = `
+    <div class="table-scroll"><table class="analytics-table">
+      <thead><tr><th>Building</th><th>Category</th><th>Total</th><th>Open</th><th>In Progress</th><th>Resolved</th><th>Rejected</th></tr></thead>
+      <tbody>${data.map(row => `
+        <tr>
+          <td>${escapeHtml(row.building)}</td>
+          <td>${escapeHtml(categoryLabels[row.category] || row.category)}</td>
+          <td>${row.total_count}</td><td>${row.open_count}</td><td>${row.in_progress_count}</td>
+          <td>${row.resolved_count}</td><td>${row.rejected_count}</td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+async function loadDuplicateFlags() {
+  duplicateTicketCounts = new Map();
+  const { data, error } = await supabaseClient.rpc("get_active_duplicate_ticket_groups");
+  if (error) {
+    console.warn("Could not load duplicate report groups:", error.message);
+    return;
+  }
+  for (const group of data || []) {
+    for (const ticketId of group.ticket_ids || []) {
+      duplicateTicketCounts.set(ticketId, group.ticket_count);
+    }
+  }
+}
+
+function populateBuildingFilter(tickets) {
+  const buildings = [...new Set(tickets.map(t => t.building))].sort();
+  const sel = document.getElementById("filterBuilding");
+  sel.innerHTML = `<option value="">All Buildings</option>` +
+    buildings.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
+}
+
+function render() {
+  const statusFilter = document.getElementById("filterStatus").value;
+  const categoryFilter = document.getElementById("filterCategory").value;
+  const buildingFilter = document.getElementById("filterBuilding").value;
+
+  const filtered = allTickets.filter(t =>
+    (!statusFilter || t.status === statusFilter) &&
+    (!categoryFilter || t.category === categoryFilter) &&
+    (!buildingFilter || t.building === buildingFilter)
+  );
+
+  const listEl = document.getElementById("ticketList");
+  if (!filtered.length) {
+    listEl.innerHTML = `<p style="color:#666;">No tickets match these filters.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(t => `
+    <div class="ticket">
+      <img src="${t.photo_url}" alt="ticket photo">
+      <div class="ticket-body">
+        <strong>${categoryLabels[t.category] || t.category}</strong>
+        <span class="badge badge-${t.status}">${statusLabels[t.status] || t.status}</span>
+        <div class="ticket-meta">${escapeHtml(t.building)}, ${escapeHtml(t.floor)}${t.is_common_area ? " (Common Area)" : ", Room " + escapeHtml(t.room_number || "-")}</div>
+        <div class="ticket-meta">Reported by: ${escapeHtml(profilesById.get(t.student_id)?.full_name || "Unknown")}</div>
+        <div class="ticket-meta">Assigned to: ${escapeHtml(profilesById.get(t.assigned_to)?.full_name || "Unassigned")}</div>
+        ${t.description ? `<div class="ticket-meta">${escapeHtml(t.description)}</div>` : ""}
+        <div class="ticket-meta">Submitted ${new Date(t.created_at).toLocaleString()}</div>
+        ${duplicateTicketCounts.has(t.id) ? `<div class="possible-duplicate">Potential duplicate · ${duplicateTicketCounts.get(t.id)} active reports for this category and location</div>` : ""}
+        <select onchange="updateStatus('${t.id}', this.value)" style="margin-top:8px;">
+          ${statusOptions.map(s => `<option value="${s}" ${s === t.status ? "selected" : ""}>${statusLabels[s]}</option>`).join("")}
+        </select>
+        <label class="assignment-label" for="assignee-${t.id}">Assign staff member</label>
+        <select id="assignee-${t.id}" onchange="assignTicket('${t.id}', this.value)">
+          <option value="">Unassigned</option>
+          ${adminStaff.map(staff => `<option value="${staff.id}" ${staff.id === t.assigned_to ? "selected" : ""}>${escapeHtml(staff.full_name || "Admin")}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function assignTicket(ticketId, staffId) {
+  const { error } = await supabaseClient.rpc("admin_assign_ticket", {
+    target_ticket_id: ticketId,
+    target_staff_id: staffId || null
+  });
+  if (error) {
+    alert(`Failed to assign ticket: ${error.message}`);
+    await loadTickets();
+    return;
+  }
+
+  const ticket = allTickets.find(t => t.id === ticketId);
+  const staff = adminStaff.find(person => person.id === staffId);
+  if (ticket) {
+    const previousStaffId = ticket.assigned_to;
+    ticket.assigned_to = staffId || null;
+    if (staff) profilesById.set(staff.id, staff);
+    else if (previousStaffId) profilesById.delete(previousStaffId);
+  }
+  render();
+}
+
+async function updateStatus(ticketId, newStatus) {
+  const { error } = await supabaseClient
+    .from("tickets")
+    .update({ status: newStatus })
+    .eq("id", ticketId);
+
+  if (error) {
+    alert(`Failed to update status: ${error.message}`);
+    return;
+  }
+
+  const t = allTickets.find(t => t.id === ticketId);
+  if (t) t.status = newStatus;
+  await loadDuplicateFlags();
+  render();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+init();
+</script>
+
+</body>
+</html>

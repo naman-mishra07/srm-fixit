@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#123b78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRM-FixIt">
+<title>SRM-FixIt — Staff Sign In</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h1>Admin / Maintenance Team</h1>
+<p class="subtitle">Confirm your password to continue to the staff dashboard.</p>
+
+<div class="card">
+  <label for="staffEmail">SRM email</label>
+  <input type="email" id="staffEmail" autocomplete="username" readonly>
+
+  <label for="staffPassword">Password</label>
+  <input type="password" id="staffPassword" autocomplete="current-password">
+
+  <button id="staffLoginBtn">Continue</button>
+  <div id="staffLoginMsg" aria-live="polite"></div>
+  <button id="studentPathBtn" class="secondary">Go to Student / Faculty</button>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="pwa-install.js"></script>
+<script>
+let currentSession = null;
+
+async function init() {
+  currentSession = await requireAuth();
+  if (!currentSession) return;
+  document.getElementById("staffEmail").value = currentSession.user.email || "";
+}
+
+document.getElementById("staffLoginBtn").addEventListener("click", async () => {
+  const password = document.getElementById("staffPassword").value;
+  const message = document.getElementById("staffLoginMsg");
+  message.textContent = "";
+
+  if (!currentSession) {
+    window.location.href = "index.html";
+    return;
+  }
+  if (!password) {
+    message.textContent = "Enter your password to continue.";
+    message.className = "error";
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: currentSession.user.email,
+    password
+  });
+  if (error || data.user?.id !== currentSession.user.id) {
+    message.textContent = error?.message || "Could not verify this account.";
+    message.className = "error";
+    return;
+  }
+
+  const profile = await getMyProfile(currentSession.user.id);
+  if (!["admin", "maintenance_worker"].includes(profile?.role)) {
+    message.textContent = "This SRM account is not enabled for the admin/maintenance team.";
+    message.className = "error";
+    return;
+  }
+  sessionStorage.setItem("srmFixitStaffReauth", currentSession.user.id);
+  window.location.href = "admin.html";
+});
+
+document.getElementById("studentPathBtn").addEventListener("click", () => {
+  window.location.href = "student.html";
+});
+
+init();
+</script>
+
+</body>
+</html>
