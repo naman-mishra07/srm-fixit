@@ -1,28 +1,25 @@
-﻿# SRM-FixIt
+# SRM-FixIt
 
-SRM-FixIt is a mobile-friendly campus maintenance ticketing PWA for SRM students and faculty, with a staff dashboard for maintenance and administrators.
+Mobile-friendly campus maintenance ticketing PWA for SRM students, faculty, and maintenance staff.
 
-## Current features
+## App files
 
-- SRM email login using Supabase Auth (public registration is not part of the app)
-- Student/faculty ticket submission with a required photo and campus location
-- Personal ticket list and status history
-- Staff dashboard with filters, status updates, optional assignment to staff accounts, duplicate flags, and analytics
-- PWA manifest, install guidance, and an offline app shell
+- `index.html`, `student.html`, `staff-login.html`, `admin.html` — login, role choice, ticket reporting, and staff dashboard
+- `style.css`, `supabase-client.js` — shared styles and Supabase connection
+- `manifest.webmanifest`, `sw.js`, `pwa-install.js`, `icons/` — PWA install and app shell
 
-## Supabase setup
+## Supabase
 
-1. Configure the project URL and publishable key in `supabase-client.js`. The publishable key is intended for browser use; never put a secret/service-role key in this app.
-2. Run the base schema and Phase 1 policies from the project's setup history if this is a new Supabase project.
-3. Run `phase2-status-notifications.sql` and `phase2-uploads-and-duplicates.sql`.
-4. Run `phase3-workers-assignment-analytics.sql`.
-5. Disable public sign-ups in Supabase Auth. Provision user accounts through the project administrator. Promote approved maintenance/admin accounts to the `admin` role using `PHASE3-SETUP.md`.
-6. Make sure Auth redirect URLs include the local development URL and the deployed app URL.
+The base schema and Phase 1 policies must already exist. In Supabase SQL Editor, run these migrations in order:
 
-Students and faculty use the Student/Faculty path. The Admin/Maintenance Team path asks the user to confirm their password and then checks the existing database role; selecting it does not grant staff privileges.
+1. `phase2-status-notifications.sql`
+2. `phase2-uploads-and-duplicates.sql`
+3. `phase3-workers-assignment-analytics.sql`
 
-See `PHASE2-SETUP.md`, `PHASE3-SETUP.md`, and `PWA-SETUP.md` for setup details.
+Set the project URL and publishable key in `supabase-client.js`. The publishable key is intended for browser use; never commit a secret/service-role key. Disable public sign-ups in Supabase Auth and provision accounts through the project administrator. Promote maintenance/admin accounts by setting their `profiles.role` to `admin`.
+
+Any signed-in user can use the Student/Faculty ticket path. The Admin/Maintenance path asks for the password again and checks that the account already has the `admin` role.
 
 ## Run locally
 
-Serve this folder over localhost with a static file server, then open `index.html`. Supabase Auth and database features require network access and a configured Supabase project.
+Serve this directory on `http://localhost` or `http://127.0.0.1` (for example, with VS Code Live Server). PWA service workers do not work from `file://`. Ticket and authentication features require an internet connection.
