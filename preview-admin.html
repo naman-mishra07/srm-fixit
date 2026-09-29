@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#AFCDE0">
+  <title>SRM-FixIt — Admin Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="preview-admin.css">
+</head>
+<body class="preview-page">
+  <header class="preview-header">
+    <div>
+      <p class="eyebrow">SRM-FixIt · Interface preview</p>
+      <h1>Admin Dashboard</h1>
+    </div>
+    <a class="button secondary" href="index.html">Back to sign in</a>
+  </header>
+
+  <main>
+    <div class="preview-notice" role="note">Preview data only. These sample tickets are not saved or connected to Supabase.</div>
+
+    <section class="card analytics" aria-labelledby="analytics-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">Campus maintenance</p><h2 id="analytics-title">Ticket Analytics</h2></div>
+        <span class="live-label"><i></i> Sample overview</span>
+      </div>
+      <div class="metrics" aria-label="Sample ticket totals">
+        <article class="metric"><span>Total tickets</span><strong>24</strong><small>Across campus</small></article>
+        <article class="metric open"><span>Open</span><strong>8</strong><small>Needs attention</small></article>
+        <article class="metric progress"><span>In progress</span><strong>11</strong><small>Being worked on</small></article>
+        <article class="metric resolved"><span>Resolved</span><strong>5</strong><small>Completed</small></article>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Building</th><th>Category</th><th>Total</th><th>Open</th><th>In progress</th><th>Resolved</th></tr></thead>
+          <tbody>
+            <tr><td>Tech Park</td><td>WiFi</td><td>8</td><td>3</td><td>4</td><td>1</td></tr>
+            <tr><td>Main Block</td><td>Electrical</td><td>6</td><td>2</td><td>2</td><td>2</td></tr>
+            <tr><td>University Building</td><td>Plumbing</td><td>4</td><td>1</td><td>2</td><td>1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="ticket-section" aria-labelledby="tickets-title">
+      <div class="section-heading list-heading">
+        <div><p class="eyebrow">Review and assign</p><h2 id="tickets-title">Recent tickets</h2></div>
+        <button class="button refresh" type="button" disabled aria-label="Preview only; refresh is disabled">↻ <span>Refresh</span></button>
+      </div>
+      <div class="filters" aria-label="Example ticket filters">
+        <input type="search" placeholder="Search tickets" aria-label="Search tickets" disabled>
+        <select aria-label="Filter by status" disabled><option>All statuses</option></select>
+        <select aria-label="Filter by category" disabled><option>All categories</option></select>
+        <select aria-label="Filter by building" disabled><option>All buildings</option></select>
+      </div>
+
+      <article class="ticket">
+        <div class="ticket-icon wifi" aria-hidden="true">⌁</div>
+        <div class="ticket-content">
+          <div class="ticket-title"><h3>WiFi signal drops in lecture hall</h3><span class="badge badge-open">Open</span></div>
+          <p class="location">Tech Park <span>·</span> 3rd Floor <span>·</span> Room 802</p>
+          <p class="description">Connection disconnects every few minutes during class.</p>
+          <div class="ticket-footer"><span>Reported by <strong>Sample Student</strong></span><span>Today, 10:24 AM</span></div>
+          <div class="ticket-actions"><label>Status<select disabled><option>Open</option></select></label><label>Assign staff<select disabled><option>Unassigned</option></select></label></div>
+        </div>
+      </article>
+
+      <article class="ticket">
+        <div class="ticket-icon power" aria-hidden="true">ϟ</div>
+        <div class="ticket-content">
+          <div class="ticket-title"><h3>Projector power cable is loose</h3><span class="badge badge-progress">In progress</span></div>
+          <p class="location">Main Block <span>·</span> 2nd Floor <span>·</span> Room 214</p>
+          <p class="description">The projector turns off when the cable is moved.</p>
+          <div class="ticket-footer"><span>Reported by <strong>Sample Faculty</strong></span><span>Yesterday, 4:12 PM</span></div>
+          <div class="ticket-actions"><label>Status<select disabled><option>In progress</option></select></label><label>Assign staff<select disabled><option>Sample Worker</option></select></label></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
