@@ -81,9 +81,8 @@ async function init() {
     window.location.href = "student.html";
     return;
   }
-  const accessKey = profile.role === "developer" ? "srmFixitDeveloperReauth" : "srmFixitStaffReauth";
-  if (sessionStorage.getItem(accessKey) !== session.user.id) {
-    window.location.href = profile.role === "developer" ? "developer-login.html" : "staff-login.html";
+  if (profile.role === "admin" && sessionStorage.getItem("srmFixitStaffReauth") !== session.user.id) {
+    window.location.href = "staff-login.html";
     return;
   }
 

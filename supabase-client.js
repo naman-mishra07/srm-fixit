@@ -66,8 +66,8 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// Redirect helper: if not logged in, bounce to login page.
-// Call this at the top of student.html and admin.html.
+// Redirect helper: persistent developer sessions rely on the live profile role.
+// Other SRM users must verify again after the 12-hour window.
 async function requireAuth() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
@@ -82,9 +82,12 @@ async function requireAuth() {
   const verifiedAt = Number(session.user.app_metadata?.srm_academia_verified_at);
   const twelveHours = 12 * 60 * 60 * 1000;
   if (!verifiedAt || Date.now() - verifiedAt > twelveHours || verifiedAt > Date.now() + 60_000) {
-    await supabaseClient.auth.signOut();
-    window.location.href = "index.html?error=srm-verification-required";
-    return null;
+    const profile = await getMyProfile(session.user.id);
+    if (profile?.role !== "developer") {
+      await supabaseClient.auth.signOut();
+      window.location.href = "index.html?error=srm-verification-required";
+      return null;
+    }
   }
   return session;
 }

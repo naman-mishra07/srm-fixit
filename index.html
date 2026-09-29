@@ -40,6 +40,7 @@
   <p>Select the area you use in SRM-FixIt.</p>
   <button id="studentRoleBtn">Student / Faculty</button>
   <button id="staffRoleBtn" class="secondary">Admin / Maintenance Team</button>
+  <button id="developerRoleBtn" class="secondary" hidden>Developer Dashboard</button>
   <div id="roleMsg" aria-live="polite"></div>
   <button id="switchAccountBtn" class="secondary">Log Out</button>
 </div>
@@ -57,9 +58,10 @@ function isSrmEmail(email) {
   return typeof email === "string" && email.trim().toLowerCase().endsWith(SRM_EMAIL_DOMAIN);
 }
 
-function showRoleChoice() {
+function showRoleChoice(role) {
   document.getElementById("loginForm").parentElement.hidden = true;
   document.getElementById("roleChoice").hidden = false;
+  document.getElementById("developerRoleBtn").hidden = role !== "developer";
 }
 
 async function prepareRoleChoice(user) {
@@ -77,7 +79,7 @@ async function prepareRoleChoice(user) {
     document.getElementById("loginMsg").className = "error";
     return false;
   }
-  showRoleChoice();
+  showRoleChoice(profile.role);
   return true;
 }
 
@@ -87,8 +89,18 @@ async function prepareRoleChoice(user) {
   if (!session) return;
   const verifiedAt = Number(session.user.app_metadata?.srm_academia_verified_at);
   const validSrmSession = verifiedAt && Date.now() - verifiedAt <= 12 * 60 * 60 * 1000 && verifiedAt <= Date.now() + 60_000;
-  if (validSrmSession) await prepareRoleChoice(session.user);
-  else await supabaseClient.auth.signOut();
+  if (validSrmSession) {
+    await prepareRoleChoice(session.user);
+    return;
+  }
+  // Developer sessions persist across ordinary app visits. Their current role
+  // is still checked against profiles and protected by Supabase RLS.
+  const profile = await getMyProfile(session.user.id);
+  if (isSrmEmail(session.user.email) && profile?.role === "developer") {
+    await prepareRoleChoice(session.user);
+  } else {
+    await supabaseClient.auth.signOut();
+  }
 })();
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -139,6 +151,10 @@ document.getElementById("studentRoleBtn").addEventListener("click", () => {
 
 document.getElementById("staffRoleBtn").addEventListener("click", () => {
   window.location.href = "staff-login.html";
+});
+
+document.getElementById("developerRoleBtn").addEventListener("click", () => {
+  window.location.href = "admin.html";
 });
 
 document.getElementById("switchAccountBtn").addEventListener("click", async () => {

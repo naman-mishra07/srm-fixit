@@ -43,6 +43,11 @@ let currentSession = null;
 async function init() {
   currentSession = await requireAuth();
   if (!currentSession) return;
+  const profile = await getMyProfile(currentSession.user.id);
+  if (profile?.role === "developer") {
+    window.location.replace("admin.html");
+    return;
+  }
   document.getElementById("staffEmail").value = currentSession.user.email || "";
 }
 
@@ -87,7 +92,6 @@ document.getElementById("staffLoginBtn").addEventListener("click", async () => {
 
   const profile = await getMyProfile(currentSession.user.id);
   if (profile?.role === "developer") {
-    sessionStorage.setItem("srmFixitDeveloperReauth", currentSession.user.id);
     window.location.href = "admin.html";
     return;
   }

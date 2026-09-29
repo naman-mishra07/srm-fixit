@@ -36,6 +36,14 @@
 <script src="supabase-client.js"></script>
 <script src="pwa-install.js"></script>
 <script>
+// A developer with a saved Supabase session goes straight to the dashboard.
+(async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session?.user.email?.trim().toLowerCase().endsWith("@srmist.edu.in")) return;
+  const profile = await getMyProfile(session.user.id);
+  if (profile?.role === "developer") window.location.replace("admin.html");
+})();
+
 document.getElementById("developerLoginBtn").addEventListener("click", async () => {
   const email = document.getElementById("developerEmail").value.trim();
   const password = document.getElementById("developerPassword").value;
@@ -83,7 +91,6 @@ document.getElementById("developerLoginBtn").addEventListener("click", async () 
     return;
   }
 
-  sessionStorage.setItem("srmFixitDeveloperReauth", data.user.id);
   window.location.href = "admin.html";
 });
 </script>
