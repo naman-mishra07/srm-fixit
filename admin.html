@@ -2,283 +2,250 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#123b78">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#AFCDE0">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SRM-FixIt">
-<title>SRM-FixIt — Admin</title>
-<link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
+<title>SRM-FixIt — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* palette: 50% / 25% / 15% / 10% */
+  --white:#F6F1E7;--blue:#AFCDE0;--yellow:#F3D77B;--red:#C73532;
+  /* supporting tones derived from the palette */
+  --paper:#FCFAF5;--ink:#22262f;--muted:#6a6963;--line:#E3DBC9;
+  --blue-soft:#E3EEF5;--blue-deep:#2f5f80;--yellow-soft:#FBF0C8;--yellow-deep:#7a5c05;--red-soft:#F8E1DF;
+  --radius:14px;--font:"Barlow",system-ui,sans-serif;--display:"Bebas Neue",Impact,sans-serif;
+  --shadow:0 1px 0 rgba(34,38,47,.04),0 6px 18px -10px rgba(34,38,47,.22);
+}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 72px)}
+body{margin:0 auto;max-width:1080px;padding:20px;background:var(--white);color:var(--ink);font:400 16px/1.5 var(--font)}
+h1{font:400 42px/1 var(--display);letter-spacing:.03em;margin:0}
+h2{font:400 28px/1 var(--display);letter-spacing:.03em;margin:0 0 12px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--blue);margin:-20px -20px 22px;padding:20px;border-radius:0 0 22px 22px}
+button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:9px 18px;background:var(--yellow);color:var(--ink);cursor:pointer}
+button.secondary{background:rgba(252,250,245,.55);box-shadow:inset 0 0 0 1px rgba(34,38,47,.25)}
+button:focus-visible,select:focus-visible{outline:3px solid var(--blue-deep);outline-offset:2px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:18px}
+.table-scroll{overflow-x:auto}
+.analytics-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.analytics-table th{text-align:left;font-weight:700;font-size:14px;color:var(--blue-deep);background:var(--blue-soft);padding:9px 10px;white-space:nowrap}
+.analytics-table th:first-child{border-radius:10px 0 0 10px}.analytics-table th:last-child{border-radius:0 10px 10px 0}
+.analytics-table td{padding:11px 10px;border-bottom:1px solid var(--line)}
+.analytics-table tr:last-child td{border-bottom:0}
+.analytics-table th:nth-child(n+3),.analytics-table td:nth-child(n+3){text-align:right}
+.analytics-table td:nth-child(3){font-weight:700}
+.analytics-table td:nth-child(4){color:var(--red);font-weight:700}
+.analytics-table td:nth-child(5){color:var(--yellow-deep)}
+.analytics-table td:nth-child(6){color:var(--blue-deep)}
+.analytics-table td:nth-child(7){color:var(--muted)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.filters select{flex:1 1 160px}
+select{font:inherit;color:var(--ink);background-color:var(--paper);border:1px solid var(--line);border-radius:999px;padding:9px 36px 9px 16px;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232f5f80' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
+#ticketList{display:grid;gap:14px}
+.ticket{display:flex;gap:16px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);position:relative}
+.ticket:has(.badge-open){border-left-color:var(--red)}
+.ticket:has(.badge-in_progress){border-left-color:var(--yellow)}
+.ticket:has(.badge-resolved){border-left-color:var(--blue)}
+.ticket:has(.badge-rejected){border-left-color:#c9c3b5}
+.ticket img{width:112px;height:112px;object-fit:cover;border-radius:10px;flex:none;background:var(--line)}
+.ticket-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ticket-body strong{font:400 30px/1 var(--display);letter-spacing:.03em}
+.ticket-meta{color:var(--muted);font-size:15px}
+.badge{display:inline-block;margin-left:10px;padding:2px 12px;border-radius:999px;font-size:13.5px;font-weight:700;letter-spacing:.02em;vertical-align:6px}
+.badge-open{background:var(--red);color:#fff}
+.badge-in_progress{background:var(--yellow);color:var(--ink)}
+.badge-resolved{background:var(--blue);color:var(--ink)}
+.badge-rejected{background:#E8E3D6;color:var(--muted)}
+.possible-duplicate{margin-top:6px;align-self:flex-start;background:var(--red-soft);color:#9c2422;font-size:13px;font-weight:700;padding:4px 12px;border-radius:999px}
+.assignment-label{margin-top:10px;font-size:13px;font-weight:700;color:var(--muted)}
+.ticket-body select{margin-top:4px;align-self:flex-start;min-width:200px;max-width:100%}
 
-<div class="top-bar">
-  <h1 style="margin-bottom:0;">Admin Dashboard</h1>
-  <div class="topbar-actions">
-    <button class="secondary" onclick="window.location.href='index.html'">Back to options</button>
-    <button class="secondary" onclick="logout()">Log Out</button>
-  </div>
-</div>
+/* gallery layout */
+body[data-layout=gallery] #ticketList{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+body[data-layout=gallery] .ticket{flex-direction:column;gap:0;padding:0;overflow:hidden;border-left-width:1px;border-top:6px solid var(--line)}
+body[data-layout=gallery] .ticket:has(.badge-open){border-top-color:var(--red)}
+body[data-layout=gallery] .ticket:has(.badge-in_progress){border-top-color:var(--yellow)}
+body[data-layout=gallery] .ticket:has(.badge-resolved){border-top-color:var(--blue)}
+body[data-layout=gallery] .ticket:has(.badge-rejected){border-top-color:#c9c3b5}
+body[data-layout=gallery] .ticket img{width:100%;height:170px;border-radius:0}
+body[data-layout=gallery] .ticket-body{padding:14px 16px 16px}
+body[data-layout=gallery] .badge{position:absolute;top:18px;left:12px;margin:0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+body[data-layout=gallery] .ticket-body select{width:100%;min-width:0;align-self:stretch}
 
-<section class="card">
-  <h2 style="margin-top:0;">Ticket Analytics</h2>
-  <div id="analytics">Loading analytics...</div>
-</section>
+.switcher{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:4px;padding:5px;border-radius:999px;background:var(--ink);box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:10}
+.switcher button{background:transparent;color:#d9d5c8;padding:9px 18px;font-size:13.5px}
+.switcher button[aria-pressed=true]{background:var(--yellow);color:var(--ink)}
+@media (max-width:560px){
+  body{padding:14px}.top-bar{margin:-14px -14px 18px;padding:16px 14px}
+  .ticket img{width:84px;height:84px}
+  body:not([data-layout=gallery]) .ticket{gap:12px;padding:12px}
+  .ticket-body select{min-width:0;width:100%}
+}
 
+.filters input{flex:2 1 220px;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:9px 16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--blue-soft);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font:400 38px/1 var(--display);letter-spacing:.03em}
+.tile span{font-size:14px;color:var(--muted)}
+.tile.warn{background:var(--red-soft)}.tile.warn b{color:var(--red)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:8px}
+.split h3{font:400 20px/1 var(--display);letter-spacing:.03em;margin:0 0 10px}
+.bars{display:flex;align-items:flex-end;gap:8px;height:90px}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:12px;color:var(--muted)}
+.bars i{display:block;width:100%;background:var(--blue);border-radius:6px 6px 0 0;min-height:2px}
+.bars div:last-child i{background:var(--yellow)}
+.hot{display:grid;gap:8px}.hot p{margin:0;font-size:14px}
+.hot em{display:block;height:8px;border-radius:99px;background:var(--red);margin-top:3px}
+.age{display:inline-block;margin-left:8px;font-size:13px;font-weight:600;color:var(--muted);vertical-align:6px}
+.age.late{color:#fff;background:var(--red);padding:1px 9px;border-radius:99px}
+.pick{position:absolute;top:12px;right:12px;z-index:2;display:block}
+.pick input{width:20px;height:20px;accent-color:var(--blue-deep);cursor:pointer}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);padding:6px 14px;font-size:14px}
+button.red{background:var(--red);color:#fff}
+.triage{margin-top:10px;background:var(--yellow-soft);border-radius:12px;padding:10px 12px;font-size:14px}
+.triage p{margin:2px 0}.triage small{color:var(--yellow-deep);font-weight:600}
+#pill{display:none;position:sticky;top:10px;z-index:5;margin:0 auto 14px;width:max-content;background:var(--ink);color:#fff}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(430px,100%);background:var(--paper);z-index:20;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 18px;overflow:auto;box-shadow:-12px 0 40px rgba(34,38,47,.25);transform:translateX(105%);transition:transform .25s}
+#drawer.open{transform:none}
+#scrim{display:none;position:fixed;inset:0;background:rgba(34,38,47,.35);z-index:19}
+#scrim.on{display:block}
+#drawer h2{font-size:32px}
+.tl{list-style:none;margin:12px 0;padding:0 0 0 14px;border-left:3px solid var(--blue)}
+.tl li{margin:0 0 12px;font-size:14.5px}.tl small{display:block;color:var(--muted)}
+.tl li.note{background:var(--yellow-soft);border-radius:10px;padding:6px 10px;margin-left:-4px}
+#drawer textarea{width:100%;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;min-height:70px}
+#bulk{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 72px);z-index:12;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:10px 14px;box-shadow:var(--shadow),0 10px 30px rgba(34,38,47,.25);width:max-content;max-width:calc(100% - 20px)}
+#bulk select{padding:7px 32px 7px 12px}
+#bulk.visible{display:flex}
+.photo-empty{width:112px;height:112px;flex:none;display:grid;place-items:center;border-radius:10px;background:var(--blue-soft);color:var(--muted);font-size:13px}
+.detail-button{align-self:flex-start;margin-top:5px}
+.topbar-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.empty,.error{color:var(--muted)}
+.error{color:var(--red)}
+.ticket-meta.description{overflow-wrap:anywhere}
+#toast.error-toast{background:#9c2422}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translate(-50%,-140%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;z-index:30;transition:transform .25s;max-width:calc(100% - 24px);font-size:14px}
+#toast.on{transform:translate(-50%,0)}
+body[data-layout=gallery] .pick{top:18px}
+@media (max-width:640px){.split{grid-template-columns:1fr}}
+
+/* ---- motion ---- */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+@keyframes drop{from{transform:translateY(-100%)}}
+@keyframes bounceIn{0%{opacity:0;transform:translateY(-24px) scale(.8)}60%{opacity:1;transform:translateY(4px) scale(1.04)}100%{transform:none}}
+@keyframes ping{from{box-shadow:0 0 0 0 rgba(243,215,123,.85)}to{box-shadow:0 0 0 14px rgba(243,215,123,0)}}
+@keyframes flash{from{background:var(--yellow-soft);box-shadow:0 0 0 3px var(--yellow)}}
+@keyframes growY{from{transform:scaleY(0)}}
+@keyframes growX{from{transform:scaleX(0)}}
+@keyframes latepulse{0%,100%{box-shadow:0 0 0 0 rgba(199,53,50,.5)}60%{box-shadow:0 0 0 7px rgba(199,53,50,0)}}
+@keyframes warn{0%,100%{box-shadow:0 0 0 0 rgba(199,53,50,0)}50%{box-shadow:0 0 0 6px rgba(199,53,50,.16)}}
+@keyframes expand{from{opacity:0;transform:scaleY(.5)}}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes bulkIn{from{opacity:0;transform:translate(-50%,28px)}}
+@keyframes bulkOut{to{opacity:0;transform:translate(-50%,28px)}}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.top-bar{animation:drop .6s cubic-bezier(.2,.8,.2,1) both}
+.top-bar h1{animation:rise .6s .2s both}
+#an.anim .tile{animation:rise .5s both}
+#an.anim .tile:nth-child(2){animation-delay:.08s}#an.anim .tile:nth-child(3){animation-delay:.16s}
+#an.anim .bars i{transform-origin:bottom;animation:growY .7s .3s cubic-bezier(.2,.8,.2,1) both}
+#an.anim .hot em{transform-origin:left;animation:growX .8s .4s cubic-bezier(.2,.8,.2,1) both}
+.tile.warn{animation:warn 2.6s ease-in-out infinite}
+.age.late{animation:latepulse 2.4s ease-out infinite}
+.ticket{transition:border-color .4s,box-shadow .3s}
+.ticket.enter{animation:rise .5s cubic-bezier(.2,.8,.2,1) calc(var(--i,0)*55ms) both}
+.ticket.fresh{animation:rise .5s cubic-bezier(.2,.8,.2,1) calc(var(--i,0)*55ms) both,flash 2.4s calc(var(--i,0)*55ms + .15s) ease-out}
+.ticket:has(.pick input:checked){box-shadow:0 0 0 2px var(--blue-deep),var(--shadow)}
+.triage.new{transform-origin:top;animation:expand .4s cubic-bezier(.2,.8,.2,1) both}
+b.shake{display:inline-block;animation:shake .5s .4s}
+button{transition:transform .15s,filter .15s}
+button:hover{transform:translateY(-1px);filter:brightness(1.05)}
+button:active{transform:translateY(1px) scale(.97)}
+#pill{animation:bounceIn .6s cubic-bezier(.3,1.4,.5,1) both}
+#pill::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;animation:ping 1.8s ease-out infinite}
+#scrim{display:block;opacity:0;pointer-events:none;transition:opacity .25s}
+#scrim.on{opacity:1;pointer-events:auto}
+#drawer[data-anim="1"] .tl li{animation:rise .35s calc(.2s + var(--k,0)*55ms) both}
+.tl li.newnote{animation:flash 1.6s ease-out}
+#bulk{animation:bulkIn .35s cubic-bezier(.2,.9,.3,1.2) both}
+#bulk.out{animation:bulkOut .25s ease-in both}
+#toast{transition:transform .5s cubic-bezier(.34,1.56,.64,1);padding-bottom:14px}
+#toast::after{content:"";position:absolute;left:18px;right:18px;bottom:5px;height:2px;border-radius:2px;background:var(--yellow);transform:scaleX(0);transform-origin:left}
+#toast.on::after{animation:shrink 2.6s linear forwards}
+.switcher button{position:relative;z-index:1}
+.switcher button[aria-pressed=true]{background:transparent}
+.slider{position:absolute;top:5px;bottom:5px;left:0;width:0;border-radius:999px;background:var(--yellow);transition:left .35s cubic-bezier(.4,1.3,.5,1),width .35s}
+
+/* ---- custom dropdowns ---- */
+select[data-dd]{display:none}
+.dd{position:relative;display:block}
+.filters .dd{flex:1 1 160px}
+.ticket-body .dd{margin-top:4px;align-self:flex-start;min-width:200px;max-width:100%}
+body[data-layout=gallery] .ticket-body .dd{width:100%;min-width:0;align-self:stretch}
+@media (max-width:560px){.ticket-body .dd{min-width:0;width:100%}}
+#bulk .dd{min-width:150px}
+.dd-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-weight:500;color:var(--ink);background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);padding:9px 14px 9px 16px;text-align:left;white-space:nowrap}
+.dd-btn:hover{transform:none;filter:none;box-shadow:inset 0 0 0 1px var(--blue-deep)}
+.dd-btn:active{transform:scale(.985)}
+.dd-btn[aria-expanded=true]{box-shadow:inset 0 0 0 2px var(--blue-deep)}
+.dd-btn .lbl{display:flex;align-items:center;gap:9px;min-width:0}
+.dd-btn .lbl span{overflow:hidden;text-overflow:ellipsis}
+.dd-btn .chev{flex:none;color:var(--blue-deep);transition:transform .3s cubic-bezier(.3,1.4,.5,1)}
+.dd-btn[aria-expanded=true] .chev{transform:rotate(180deg)}
+.dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 28%,transparent)}
+.dot.ring{background:transparent;box-shadow:inset 0 0 0 2px #c9c3b5}
+.av{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--blue);font:700 9.5px/1 var(--font);font-style:normal}
+#ddmenu{display:none;position:fixed;z-index:40;max-height:280px;overflow:auto;padding:6px;background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -12px rgba(34,38,47,.35)}
+#ddmenu[data-dir=down]{transform-origin:top left}
+#ddmenu[data-dir=up]{transform-origin:bottom left}
+#ddmenu.open{animation:ddIn .24s cubic-bezier(.2,.9,.3,1.15) both}
+#ddmenu[data-dir=up].open{animation-name:ddInUp}
+#ddmenu.out{animation:ddOut .12s ease-in both}
+@keyframes ddIn{from{opacity:0;transform:scale(.94) translateY(-6px)}}
+@keyframes ddInUp{from{opacity:0;transform:scale(.94) translateY(6px)}}
+@keyframes ddOut{to{opacity:0;transform:scale(.96)}}
+@keyframes ddOpt{from{opacity:0;transform:translateX(-6px)}}
+.dd-opt{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:15px;animation:ddOpt .28s calc(.04s + var(--k,0)*30ms) both}
+.dd-opt .t{flex:1;white-space:nowrap}
+.dd-opt.hl{background:var(--blue-soft)}
+.dd-opt[aria-selected=true]{font-weight:700}
+.dd-opt .chk{color:var(--blue-deep);opacity:0;transform:scale(.5);transition:transform .3s cubic-bezier(.3,1.5,.5,1),opacity .2s}
+.dd-opt[aria-selected=true] .chk{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+</style></head><body data-layout="list">
+<div class="top-bar"><h1>Admin Dashboard</h1><div class="topbar-actions">
+  <button class="secondary" onclick="window.location.href='index.html'">Back to options</button>
+  <button class="secondary" data-act="logout">Log Out</button>
+</div></div>
+<button id="pill" data-act="pill"></button>
+<section class="card"><h2>Ticket Analytics</h2><div id="an"></div></section>
 <div class="filters">
-  <select id="filterStatus">
-    <option value="">All Statuses</option>
-    <option value="open">Open</option>
-    <option value="in_progress">In Progress</option>
-    <option value="resolved">Resolved</option>
-    <option value="rejected">Rejected</option>
-  </select>
-
-  <select id="filterCategory">
-    <option value="">All Categories</option>
-    <option value="wifi">WiFi</option>
-    <option value="furniture">Furniture</option>
-    <option value="ac">AC</option>
-    <option value="electrical">Electrical</option>
-    <option value="smartboards_mics">Smartboards & Mics</option>
-    <option value="plumbing">Plumbing</option>
-    <option value="cleaning">Cleaning</option>
-  </select>
-
-  <select id="filterBuilding">
-    <option value="">All Buildings</option>
-  </select>
+  <input id="q" type="search" placeholder="Search description, room, reporter" aria-label="Search tickets">
+  <select id="so" aria-label="Sort"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="dup">Most duplicate reports</option></select>
+  <select id="fs" aria-label="Status"><option value="">All Statuses</option></select>
+  <select id="fc" aria-label="Category"><option value="">All Categories</option></select>
+  <select id="fb" aria-label="Building"><option value="">All Buildings</option></select>
 </div>
-
-<div id="ticketList">Loading...</div>
-
+<div id="ticketList" aria-live="polite"><p class="empty">Loading tickets…</p></div>
+<div id="bulk"><b id="bn"></b>
+  <select id="ba" aria-label="Assign selected"></select>
+  <select id="bs" aria-label="Set status for selected"></select>
+  <button class="ghost" data-act="clearsel">Clear</button></div>
+<div id="scrim"></div><aside id="drawer" aria-label="Ticket details"></aside><div id="toast" role="status"></div>
+<div class="switcher" role="group" aria-label="Ticket display controls">
+  <button data-l="list" aria-pressed="true">List</button><button data-l="gallery" aria-pressed="false">Gallery</button><button data-act="refresh">Refresh</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="pwa-install.js"></script>
-<script>
-const categoryLabels = {
-  wifi: "WiFi", furniture: "Furniture", ac: "AC", electrical: "Electrical",
-  smartboards_mics: "Smartboards & Mics", plumbing: "Plumbing", cleaning: "Cleaning"
-};
-const statusOptions = ["open", "in_progress", "resolved", "rejected"];
-const statusLabels = {
-  open: "Open", in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected"
-};
-
-let allTickets = [];
-let duplicateTicketCounts = new Map();
-let adminStaff = [];
-let profilesById = new Map();
-
-async function init() {
-  const session = await requireAuth();
-  if (!session) return;
-
-  const profile = await getMyProfile(session.user.id);
-  if (!profile || !["admin", "developer"].includes(profile.role)) {
-    // Not an admin — RLS would block their queries anyway, but bounce them cleanly.
-    window.location.href = "student.html";
-    return;
-  }
-  const accessKey = profile.role === "developer" ? "srmFixitDeveloperReauth" : "srmFixitStaffReauth";
-  if (sessionStorage.getItem(accessKey) !== session.user.id) {
-    window.location.href = profile.role === "developer" ? "developer-login.html" : "staff-login.html";
-    return;
-  }
-  await Promise.all([loadAdminStaff(), loadAnalytics()]);
-  await loadTickets();
-
-  document.getElementById("filterStatus").addEventListener("change", render);
-  document.getElementById("filterCategory").addEventListener("change", render);
-  document.getElementById("filterBuilding").addEventListener("change", render);
-}
-
-async function loadTickets() {
-  const { data, error } = await supabaseClient
-    .from("tickets")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  const listEl = document.getElementById("ticketList");
-  if (error) {
-    listEl.innerHTML = `<div class="error">Failed to load tickets: ${error.message}</div>`;
-    return;
-  }
-
-  allTickets = data;
-  await loadTicketProfiles(data);
-  populateBuildingFilter(data);
-  await loadDuplicateFlags();
-  render();
-}
-
-async function loadTicketProfiles(tickets) {
-  const profileIds = [...new Set(tickets.flatMap(ticket => [ticket.student_id, ticket.assigned_to]).filter(Boolean))];
-  profilesById = new Map();
-  if (!profileIds.length) return;
-
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .select("id, full_name")
-    .in("id", profileIds);
-  if (error) {
-    console.error("Could not load ticket profiles:", error.message);
-    return;
-  }
-  profilesById = new Map((data || []).map(profile => [profile.id, profile]));
-}
-
-async function loadAdminStaff() {
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .select("id, full_name")
-    .eq("role", "admin")
-    .order("full_name");
-  if (error) {
-    console.error("Could not load admin staff:", error.message);
-    adminStaff = [];
-    return;
-  }
-  adminStaff = data || [];
-}
-
-async function loadAnalytics() {
-  const analyticsEl = document.getElementById("analytics");
-  const { data, error } = await supabaseClient.rpc("get_ticket_analytics");
-  if (error) {
-    analyticsEl.innerHTML = `<div class="error">Could not load analytics: ${escapeHtml(error.message)}</div>`;
-    return;
-  }
-  if (!data.length) {
-    analyticsEl.innerHTML = `<p>No tickets to summarize yet.</p>`;
-    return;
-  }
-  analyticsEl.innerHTML = `
-    <div class="table-scroll"><table class="analytics-table">
-      <thead><tr><th>Building</th><th>Category</th><th>Total</th><th>Open</th><th>In Progress</th><th>Resolved</th><th>Rejected</th></tr></thead>
-      <tbody>${data.map(row => `
-        <tr>
-          <td>${escapeHtml(row.building)}</td>
-          <td>${escapeHtml(categoryLabels[row.category] || row.category)}</td>
-          <td>${row.total_count}</td><td>${row.open_count}</td><td>${row.in_progress_count}</td>
-          <td>${row.resolved_count}</td><td>${row.rejected_count}</td>
-        </tr>`).join("")}</tbody>
-    </table></div>`;
-}
-
-async function loadDuplicateFlags() {
-  duplicateTicketCounts = new Map();
-  const { data, error } = await supabaseClient.rpc("get_active_duplicate_ticket_groups");
-  if (error) {
-    console.warn("Could not load duplicate report groups:", error.message);
-    return;
-  }
-  for (const group of data || []) {
-    for (const ticketId of group.ticket_ids || []) {
-      duplicateTicketCounts.set(ticketId, group.ticket_count);
-    }
-  }
-}
-
-function populateBuildingFilter(tickets) {
-  const buildings = [...new Set(tickets.map(t => t.building))].sort();
-  const sel = document.getElementById("filterBuilding");
-  sel.innerHTML = `<option value="">All Buildings</option>` +
-    buildings.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
-}
-
-function render() {
-  const statusFilter = document.getElementById("filterStatus").value;
-  const categoryFilter = document.getElementById("filterCategory").value;
-  const buildingFilter = document.getElementById("filterBuilding").value;
-
-  const filtered = allTickets.filter(t =>
-    (!statusFilter || t.status === statusFilter) &&
-    (!categoryFilter || t.category === categoryFilter) &&
-    (!buildingFilter || t.building === buildingFilter)
-  );
-
-  const listEl = document.getElementById("ticketList");
-  if (!filtered.length) {
-    listEl.innerHTML = `<p style="color:#666;">No tickets match these filters.</p>`;
-    return;
-  }
-
-  listEl.innerHTML = filtered.map(t => `
-    <div class="ticket">
-      <img src="${t.photo_url}" alt="ticket photo">
-      <div class="ticket-body">
-        <strong>${categoryLabels[t.category] || t.category}</strong>
-        <span class="badge badge-${t.status}">${statusLabels[t.status] || t.status}</span>
-        <div class="ticket-meta">${escapeHtml(t.building)}, ${escapeHtml(t.floor)}${t.is_common_area ? " (Common Area)" : ", Room " + escapeHtml(t.room_number || "-")}</div>
-        <div class="ticket-meta">Reported by: ${escapeHtml(profilesById.get(t.student_id)?.full_name || "Unknown")}</div>
-        <div class="ticket-meta">Assigned to: ${escapeHtml(profilesById.get(t.assigned_to)?.full_name || "Unassigned")}</div>
-        ${t.description ? `<div class="ticket-meta">${escapeHtml(t.description)}</div>` : ""}
-        <div class="ticket-meta">Submitted ${new Date(t.created_at).toLocaleString()}</div>
-        ${duplicateTicketCounts.has(t.id) ? `<div class="possible-duplicate">Potential duplicate · ${duplicateTicketCounts.get(t.id)} active reports for this category and location</div>` : ""}
-        <select onchange="updateStatus('${t.id}', this.value)" style="margin-top:8px;">
-          ${statusOptions.map(s => `<option value="${s}" ${s === t.status ? "selected" : ""}>${statusLabels[s]}</option>`).join("")}
-        </select>
-        <label class="assignment-label" for="assignee-${t.id}">Assign staff member</label>
-        <select id="assignee-${t.id}" onchange="assignTicket('${t.id}', this.value)">
-          <option value="">Unassigned</option>
-          ${adminStaff.map(staff => `<option value="${staff.id}" ${staff.id === t.assigned_to ? "selected" : ""}>${escapeHtml(staff.full_name || "Admin")}</option>`).join("")}
-        </select>
-      </div>
-    </div>
-  `).join("");
-}
-
-async function assignTicket(ticketId, staffId) {
-  const { error } = await supabaseClient.rpc("admin_assign_ticket", {
-    target_ticket_id: ticketId,
-    target_staff_id: staffId || null
-  });
-  if (error) {
-    alert(`Failed to assign ticket: ${error.message}`);
-    await loadTickets();
-    return;
-  }
-
-  const ticket = allTickets.find(t => t.id === ticketId);
-  const staff = adminStaff.find(person => person.id === staffId);
-  if (ticket) {
-    const previousStaffId = ticket.assigned_to;
-    ticket.assigned_to = staffId || null;
-    if (staff) profilesById.set(staff.id, staff);
-    else if (previousStaffId) profilesById.delete(previousStaffId);
-  }
-  render();
-}
-
-async function updateStatus(ticketId, newStatus) {
-  const { error } = await supabaseClient
-    .from("tickets")
-    .update({ status: newStatus })
-    .eq("id", ticketId);
-
-  if (error) {
-    alert(`Failed to update status: ${error.message}`);
-    return;
-  }
-
-  const t = allTickets.find(t => t.id === ticketId);
-  if (t) t.status = newStatus;
-  await loadDuplicateFlags();
-  render();
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-init();
-</script>
-
-</body>
-</html>
+<script src="admin.js"></script></body></html>

@@ -5,7 +5,7 @@ Mobile-friendly campus maintenance ticketing PWA for SRM students, faculty, and 
 ## App files
 
 - `index.html`, `student.html`, `staff-login.html`, `developer-login.html`, `admin.html` — sign-in, role choice, ticket reporting, and staff/developer access
-- `style.css`, `supabase-client.js` — shared styles and Supabase browser client
+- `style.css`, `supabase-client.js`, `admin.js` — shared client and live admin dashboard logic
 - `server.js`, `package.json`, `.env.example` — server-side SRM Academia verification and local web server
 - `manifest.webmanifest`, `sw.js`, `pwa-install.js`, `icons/` — PWA install and app shell
 

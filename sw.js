@@ -1,10 +1,11 @@
-const CACHE_NAME = "srm-fixit-shell-v12";
+const CACHE_NAME = "srm-fixit-shell-v13";
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./student.html",
   "./admin.html",
+  "./admin.js",
   "./staff-login.html",
   "./developer-login.html",
   "./style.css",
