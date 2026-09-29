@@ -17,17 +17,18 @@
 <body>
 
 <h1>Admin / Maintenance Team</h1>
-<p class="subtitle">Confirm your password to continue to the staff dashboard.</p>
+<p class="subtitle">Confirm your SRM Academia password to continue to the staff dashboard.</p>
 
 <div class="card">
   <label for="staffEmail">SRM email</label>
   <input type="email" id="staffEmail" autocomplete="username" readonly>
 
-  <label for="staffPassword">Password</label>
+  <label for="staffPassword">SRM Academia password</label>
   <input type="password" id="staffPassword" autocomplete="current-password">
 
   <button id="staffLoginBtn">Continue</button>
   <div id="staffLoginMsg" aria-live="polite"></div>
+  <button id="optionsPathBtn" class="secondary">Back to options</button>
   <button id="studentPathBtn" class="secondary">Go to Student / Faculty</button>
 </div>
 
@@ -57,18 +58,37 @@ document.getElementById("staffLoginBtn").addEventListener("click", async () => {
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: currentSession.user.email,
-    password
-  });
-  if (error || data.user?.id !== currentSession.user.id) {
-    message.textContent = error?.message || "Could not verify this account.";
-    message.className = "error";
+  const button = document.getElementById("staffLoginBtn");
+  button.disabled = true;
+  button.textContent = "Verifying with SRM...";
+  let data;
+  let authenticated = false;
+  try {
+    const result = await requestSrmAuthToken(currentSession.user.email, password);
+    const verified = await supabaseClient.auth.verifyOtp({ token_hash: result.tokenHash, type: "magiclink" });
+    if (verified.error || verified.data.user?.id !== currentSession.user.id) {
+      throw new Error("Could not verify this FixIt account. Sign out and sign in with the matching SRM account.");
+    }
+    authenticated = true;
+    data = verified.data;
+  } catch (error) {
+    showSrmAuthError(message, error);
+    button.disabled = false;
+    button.textContent = "Continue";
     return;
+  } finally {
+    if (authenticated) document.getElementById("staffPassword").value = "";
+    button.disabled = false;
+    button.textContent = "Continue";
   }
 
   const profile = await getMyProfile(currentSession.user.id);
-  if (!["admin", "maintenance_worker"].includes(profile?.role)) {
+  if (profile?.role === "developer") {
+    sessionStorage.setItem("srmFixitDeveloperReauth", currentSession.user.id);
+    window.location.href = "admin.html";
+    return;
+  }
+  if (profile?.role !== "admin") {
     message.textContent = "This SRM account is not enabled for the admin/maintenance team.";
     message.className = "error";
     return;
@@ -79,6 +99,10 @@ document.getElementById("staffLoginBtn").addEventListener("click", async () => {
 
 document.getElementById("studentPathBtn").addEventListener("click", () => {
   window.location.href = "student.html";
+});
+
+document.getElementById("optionsPathBtn").addEventListener("click", () => {
+  window.location.href = "index.html";
 });
 
 init();

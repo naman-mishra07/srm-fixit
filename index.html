@@ -17,14 +17,14 @@
 <body>
 
 <h1>SRM-FixIt</h1>
-<p class="subtitle">Students, faculty, and staff: sign in with your college email and SRM-FixIt password.</p>
+<p class="subtitle">Students, faculty, and staff: sign in with your SRM Academia account.</p>
 
 <div class="card">
   <div id="loginForm">
     <label for="loginEmail">College email</label>
     <input type="email" id="loginEmail" placeholder="you@srmist.edu.in" autocomplete="username">
 
-    <label for="loginPassword">Password</label>
+    <label for="loginPassword">SRM Academia password</label>
     <input type="password" id="loginPassword" autocomplete="current-password">
 
     <button id="loginBtn">Log In</button>
@@ -40,6 +40,10 @@
   <div id="roleMsg" aria-live="polite"></div>
   <button id="switchAccountBtn" class="secondary">Log Out</button>
 </div>
+
+<footer class="developer-footer">
+  <a href="developer-login.html">Developer sign in</a>
+</footer>
 
 <script src="supabase-client.js"></script>
 <script src="pwa-install.js"></script>
@@ -64,7 +68,7 @@ async function prepareRoleChoice(user) {
   }
 
   const profile = await getMyProfile(user.id);
-  if (!profile || !["student", "admin", "maintenance_worker"].includes(profile.role)) {
+  if (!profile || !["student", "admin", "developer"].includes(profile.role)) {
     await supabaseClient.auth.signOut();
     document.getElementById("loginMsg").textContent = "This account is not enabled for SRM-FixIt. Contact the administrator.";
     document.getElementById("loginMsg").className = "error";
@@ -74,10 +78,14 @@ async function prepareRoleChoice(user) {
   return true;
 }
 
-// Existing sessions go to the role selection screen too.
+// Only a recent SRM Academia verification may resume an existing session.
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) await prepareRoleChoice(session.user);
+  if (!session) return;
+  const verifiedAt = Number(session.user.app_metadata?.srm_academia_verified_at);
+  const validSrmSession = verifiedAt && Date.now() - verifiedAt <= 12 * 60 * 60 * 1000 && verifiedAt <= Date.now() + 60_000;
+  if (validSrmSession) await prepareRoleChoice(session.user);
+  else await supabaseClient.auth.signOut();
 })();
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -97,14 +105,29 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    msg.textContent = error.message;
-    msg.className = "error";
-    return;
-  }
+  const loginButton = document.getElementById("loginBtn");
+  loginButton.disabled = true;
+  loginButton.textContent = "Verifying with SRM...";
+  let authenticated = false;
+  try {
+    const result = await requestSrmAuthToken(email, password);
 
-  await prepareRoleChoice(data.user);
+    // The backend returns only a one-time Supabase token hash. Academia cookies
+    // and the submitted SRM password never leave the backend.
+    const { data, error } = await supabaseClient.auth.verifyOtp({
+      token_hash: result.tokenHash,
+      type: "magiclink"
+    });
+    if (error) throw new Error("SRM was verified, but FixIt could not start your session. Try again.");
+    authenticated = true;
+    await prepareRoleChoice(data.user);
+  } catch (error) {
+    showSrmAuthError(msg, error);
+  } finally {
+    if (authenticated) document.getElementById("loginPassword").value = "";
+    loginButton.disabled = false;
+    loginButton.textContent = "Log In";
+  }
 });
 
 document.getElementById("studentRoleBtn").addEventListener("click", () => {

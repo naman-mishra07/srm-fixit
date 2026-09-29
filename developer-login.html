@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#123b78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRM-FixIt">
+<title>SRM-FixIt — Developer Sign In</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h1>Developer Sign In</h1>
+
+<div class="card">
+  <label for="developerEmail">SRM email</label>
+  <input type="email" id="developerEmail" placeholder="you@srmist.edu.in" autocomplete="username">
+
+  <label for="developerPassword">SRM Academia password</label>
+  <input type="password" id="developerPassword" autocomplete="current-password">
+
+  <button id="developerLoginBtn">Sign In</button>
+  <div id="developerLoginMsg" aria-live="polite"></div>
+  <button class="secondary" onclick="window.location.href='index.html'">Back to options</button>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="pwa-install.js"></script>
+<script>
+document.getElementById("developerLoginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("developerEmail").value.trim();
+  const password = document.getElementById("developerPassword").value;
+  const message = document.getElementById("developerLoginMsg");
+  message.textContent = "";
+
+  if (!email.toLowerCase().endsWith("@srmist.edu.in")) {
+    message.textContent = "Use your SRM college email address.";
+    message.className = "error";
+    return;
+  }
+  if (!password) {
+    message.textContent = "Enter your password.";
+    message.className = "error";
+    return;
+  }
+
+  const button = document.getElementById("developerLoginBtn");
+  button.disabled = true;
+  button.textContent = "Verifying with SRM...";
+  let data;
+  let authenticated = false;
+  try {
+    const result = await requestSrmAuthToken(email, password);
+    const verified = await supabaseClient.auth.verifyOtp({ token_hash: result.tokenHash, type: "magiclink" });
+    if (verified.error) throw new Error("SRM was verified, but FixIt could not start your session. Try again.");
+    authenticated = true;
+    data = verified.data;
+  } catch (error) {
+    showSrmAuthError(message, error);
+    button.disabled = false;
+    button.textContent = "Sign In";
+    return;
+  } finally {
+    if (authenticated) document.getElementById("developerPassword").value = "";
+    button.disabled = false;
+    button.textContent = "Sign In";
+  }
+
+  const profile = await getMyProfile(data.user.id);
+  if (profile?.role !== "developer") {
+    await supabaseClient.auth.signOut();
+    message.textContent = "This account is not authorized for developer access.";
+    message.className = "error";
+    return;
+  }
+
+  sessionStorage.setItem("srmFixitDeveloperReauth", data.user.id);
+  window.location.href = "admin.html";
+});
+</script>
+
+</body>
+</html>
