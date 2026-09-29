@@ -3,267 +3,358 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#123b78">
+<meta name="theme-color" content="#AFCDE0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SRM-FixIt">
 <title>SRM-FixIt — My Tickets</title>
-<link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap"></noscript>
+<style>
+:root{--white:#F6F1E7;--blue:#AFCDE0;--yellow:#F3D77B;--red:#C73532;--paper:#FCFAF5;--ink:#22262f;--muted:#6a6963;--line:#E3DBC9;--blue-soft:#E3EEF5;--blue-deep:#2f5f80;--yellow-soft:#FBF0C8;--red-soft:#F8E1DF;--radius:14px;--font:"Barlow",system-ui,sans-serif;--display:"Bebas Neue",Impact,sans-serif;--shadow:0 1px 0 rgba(34,38,47,.04),0 6px 18px -10px rgba(34,38,47,.22)}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 72px)}
+body{margin:0 auto;max-width:1080px;padding:20px;background:var(--white);color:var(--ink);font:400 16px/1.5 var(--font)}
+h1{font:400 42px/1 var(--display);letter-spacing:.03em;margin:0}
+h2{font:400 28px/1 var(--display);letter-spacing:.03em;margin:0 0 12px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--blue);margin:-20px -20px 22px;padding:20px;border-radius:0 0 22px 22px}
+button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:9px 18px;background:var(--yellow);color:var(--ink);cursor:pointer;transition:transform .15s,filter .15s}
+button:hover{transform:translateY(-1px);filter:brightness(1.05)}button:active{transform:translateY(1px) scale(.97)}
+button.secondary{background:rgba(252,250,245,.55);box-shadow:inset 0 0 0 1px rgba(34,38,47,.25)}
+button.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);padding:6px 14px;font-size:14px}
+:focus-visible{outline:3px solid var(--blue-deep);outline-offset:2px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:18px}
+.meta,.ticket-meta{color:var(--muted);font-size:15px}
+.error{color:var(--red)}.success{color:#2c7a55}
+
+/* report form */
+.toggle{display:flex;align-items:center;gap:14px;width:100%;background:none;padding:0;text-align:left;border-radius:0;font-weight:400}
+.toggle:hover{filter:none;transform:none}
+.plus{flex:none;width:44px;height:44px;border-radius:14px;background:var(--red);color:#fff;display:grid;place-items:center;font-size:28px;transition:transform .3s cubic-bezier(.3,1.4,.5,1)}
+.toggle[aria-expanded=true] .plus{transform:rotate(45deg)}
+.toggle b{display:block;font:400 26px/1 var(--display);letter-spacing:.03em}
+#reportForm{display:none;margin-top:6px}#reportForm.open{display:block;animation:expand .35s cubic-bezier(.2,.8,.2,1) both;transform-origin:top}
+.field{margin-top:14px}
+.field>label,.legend{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+.opt{font-weight:400;color:var(--muted)}
+input[type=text],input[type=search],textarea{width:100%;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-height:44px}
+textarea{min-height:84px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span{display:inline-flex;gap:6px;align-items:center;padding:8px 14px;border-radius:999px;background:var(--blue-soft);cursor:pointer;font-weight:600;font-size:15px;transition:background .2s,transform .2s}
+.chip input:checked+span{background:var(--yellow);box-shadow:inset 0 0 0 2px var(--ink);transform:scale(1.04)}
+.chip input:focus-visible+span{outline:3px solid var(--blue-deep);outline-offset:2px}
+.switch{display:flex;gap:10px;align-items:center;padding:11px 14px;border-radius:12px;background:var(--blue-soft);cursor:pointer;font-size:15px}
+.switch input{width:20px;height:20px;accent-color:var(--blue-deep)}
+.drop{display:block;position:relative;border:2px dashed var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;overflow:hidden}
+.drop:hover{border-color:var(--blue-deep)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop img{display:none;width:100%;max-height:220px;object-fit:cover;border-radius:10px}
+.drop.has{padding:6px}.drop.has img{display:block}.drop.has .dz{display:none}
+.send{width:100%;margin-top:18px;padding:13px;background:var(--red);color:#fff;font-size:17px}
+.send:disabled{opacity:.6;cursor:progress}
+#submitMsg{margin-top:8px;min-height:1.3em;font-size:15px}
+
+/* analytics tiles + updates */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px}
+.tile{background:var(--blue-soft);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font:400 38px/1 var(--display);letter-spacing:.03em}
+.tile span{font-size:14px;color:var(--muted)}
+.tile.warn{background:var(--yellow-soft)}
+.ups{display:grid;gap:8px}
+.up{display:flex;gap:10px;font-size:14.5px}
+.dot{flex:none;width:10px;height:10px;margin-top:7px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 28%,transparent)}
+.more{margin-top:8px;padding:5px 14px;font-size:14px}
+
+/* filters */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.filters input{flex:2 1 220px;border-radius:999px;padding:9px 16px}
+select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:9px 16px}
+
+/* tickets */
+#ticketList{display:grid;gap:14px}
+.ticket{display:flex;gap:16px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);position:relative;transition:border-color .4s,box-shadow .3s}
+.ticket:has(.badge-open){border-left-color:var(--red)}
+.ticket:has(.badge-in_progress){border-left-color:var(--yellow)}
+.ticket:has(.badge-resolved){border-left-color:var(--blue)}
+.ticket:has(.badge-rejected){border-left-color:#c9c3b5}
+.ticket img{width:112px;height:112px;object-fit:cover;border-radius:10px;flex:none;background:var(--line)}
+.ticket-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ticket-body strong{font:400 30px/1 var(--display);letter-spacing:.03em}
+.badge{display:inline-block;margin-left:10px;padding:2px 12px;border-radius:999px;font-size:13.5px;font-weight:700;vertical-align:6px}
+.badge-open{background:var(--red);color:#fff}.badge-in_progress{background:var(--yellow)}
+.badge-resolved{background:var(--blue)}.badge-rejected{background:#E8E3D6;color:var(--muted)}
+.age{margin-left:8px;font-size:13px;font-weight:600;color:var(--muted);vertical-align:6px}
+.age.late{color:#fff;background:var(--red);padding:1px 9px;border-radius:99px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.empty{color:var(--muted);padding:6px 0}
+body[data-layout=gallery] #ticketList{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+body[data-layout=gallery] .ticket{flex-direction:column;gap:0;padding:0;overflow:hidden;border-left-width:1px;border-top:6px solid var(--line)}
+body[data-layout=gallery] .ticket:has(.badge-open){border-top-color:var(--red)}
+body[data-layout=gallery] .ticket:has(.badge-in_progress){border-top-color:var(--yellow)}
+body[data-layout=gallery] .ticket:has(.badge-resolved){border-top-color:var(--blue)}
+body[data-layout=gallery] .ticket:has(.badge-rejected){border-top-color:#c9c3b5}
+body[data-layout=gallery] .ticket img{width:100%;height:170px;border-radius:0}
+body[data-layout=gallery] .ticket-body{padding:14px 16px 16px}
+body[data-layout=gallery] .badge{position:absolute;top:18px;left:12px;margin:0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+@media (max-width:560px){body{padding:14px}.top-bar{margin:-14px -14px 18px;padding:16px 14px}.ticket img{width:84px;height:84px}.two{grid-template-columns:1fr}}
+
+/* drawer, toast, switcher */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(430px,100%);background:var(--paper);z-index:20;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 18px;overflow:auto;box-shadow:-12px 0 40px rgba(34,38,47,.25);transform:translateX(105%);transition:transform .25s}
+#drawer.open{transform:none}
+#drawer img{width:100%;max-height:240px;object-fit:cover;border-radius:12px;margin:12px 0}
+#scrim{position:fixed;inset:0;background:rgba(34,38,47,.35);z-index:19;opacity:0;pointer-events:none;transition:opacity .25s}
+#scrim.on{opacity:1;pointer-events:auto}
+.tl{list-style:none;margin:12px 0;padding:0 0 0 14px;border-left:3px solid var(--blue)}
+.tl li{margin:0 0 12px;font-size:14.5px}.tl small{display:block;color:var(--muted)}
+#drawer[data-anim="1"] .tl li{animation:rise .35s calc(.2s + var(--k,0)*55ms) both}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translate(-50%,-140%);background:var(--ink);color:#fff;padding:10px 18px 14px;border-radius:999px;z-index:30;transition:transform .5s cubic-bezier(.34,1.56,.64,1);max-width:calc(100% - 24px);font-size:14px}
+#toast.on{transform:translate(-50%,0)}
+#toast::after{content:"";position:absolute;left:18px;right:18px;bottom:5px;height:2px;border-radius:2px;background:var(--yellow);transform:scaleX(0);transform-origin:left}
+#toast.on::after{animation:shrink 2.6s linear forwards}
+.switcher{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:4px;padding:5px;border-radius:999px;background:var(--ink);box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:10}
+.switcher button{position:relative;z-index:1;background:transparent;color:#d9d5c8;padding:9px 18px;font-size:13.5px}
+.switcher button[aria-pressed=true]{color:var(--ink)}
+.slider{position:absolute;top:5px;bottom:5px;left:0;width:0;border-radius:999px;background:var(--yellow);transition:left .35s cubic-bezier(.4,1.3,.5,1),width .35s}
+
+/* custom dropdowns */
+select[data-dd]{display:none}
+.dd{flex:1 1 160px}
+.dd-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-weight:500;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);padding:9px 14px 9px 16px;text-align:left}
+.dd-btn:hover{transform:none;filter:none;box-shadow:inset 0 0 0 1px var(--blue-deep)}
+.dd-btn[aria-expanded=true]{box-shadow:inset 0 0 0 2px var(--blue-deep)}
+.lbl{display:flex;align-items:center;gap:9px}
+.chev{color:var(--blue-deep);transition:transform .3s cubic-bezier(.3,1.4,.5,1)}
+.dd-btn[aria-expanded=true] .chev{transform:rotate(180deg)}
+.dot.ring{background:transparent;box-shadow:inset 0 0 0 2px #c9c3b5}
+#ddmenu{display:none;position:fixed;z-index:40;max-height:280px;overflow:auto;padding:6px;background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -12px rgba(34,38,47,.35);transform-origin:top left}
+#ddmenu.open{animation:ddIn .24s cubic-bezier(.2,.9,.3,1.15) both}
+#ddmenu.out{animation:ddOut .12s ease-in both}
+.dd-opt{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:15px;animation:ddOpt .28s calc(.04s + var(--k,0)*30ms) both}
+.dd-opt .t{flex:1;white-space:nowrap}.dd-opt.hl{background:var(--blue-soft)}
+.dd-opt[aria-selected=true]{font-weight:700}
+.chk{color:var(--blue-deep);opacity:0;transition:opacity .2s}.dd-opt[aria-selected=true] .chk{opacity:1}
+
+/* motion */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+@keyframes drop{from{transform:translateY(-100%)}}
+@keyframes flash{from{background:var(--yellow-soft);box-shadow:0 0 0 3px var(--yellow)}}
+@keyframes expand{from{opacity:0;transform:scaleY(.5)}}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@keyframes latepulse{0%,100%{box-shadow:0 0 0 0 rgba(199,53,50,.5)}60%{box-shadow:0 0 0 7px rgba(199,53,50,0)}}
+@keyframes ddIn{from{opacity:0;transform:scale(.94) translateY(-6px)}}
+@keyframes ddOut{to{opacity:0;transform:scale(.96)}}
+@keyframes ddOpt{from{opacity:0;transform:translateX(-6px)}}
+.top-bar{animation:drop .6s cubic-bezier(.2,.8,.2,1) both}
+.top-bar h1{animation:rise .6s .2s both}
+.tile{animation:rise .5s both}.tile:nth-child(2){animation-delay:.08s}.tile:nth-child(3){animation-delay:.16s}
+.age.late{animation:latepulse 2.4s ease-out infinite}
+.ticket.enter{animation:rise .5s cubic-bezier(.2,.8,.2,1) calc(var(--i,0)*55ms) both}
+.ticket.fresh{animation:rise .5s cubic-bezier(.2,.8,.2,1) calc(var(--i,0)*55ms) both,flash 2.4s calc(var(--i,0)*55ms + .15s) ease-out}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+</style>
 </head>
-<body>
+<body data-layout="list">
 
-<div class="top-bar">
-  <h1 style="margin-bottom:0;">My Tickets</h1>
-  <button class="secondary" onclick="logout()">Log Out</button>
-</div>
+<div class="top-bar"><h1>My Tickets</h1><button class="secondary" onclick="logout()">Log Out</button></div>
 
-<div class="card">
-  <h3 style="margin-top:0;">Report an Issue</h3>
-
-  <label for="category">Category</label>
-  <select id="category">
-    <option value="wifi">WiFi</option>
-    <option value="furniture">Furniture</option>
-    <option value="ac">AC</option>
-    <option value="electrical">Electrical</option>
-    <option value="smartboards_mics">Smartboards & Mics</option>
-    <option value="plumbing">Plumbing</option>
-    <option value="cleaning">Cleaning</option>
-  </select>
-
-  <label for="building">Building</label>
-  <input type="text" id="building" placeholder="e.g. Tech Park">
-
-  <label for="floor">Floor</label>
-  <input type="text" id="floor" placeholder="e.g. 3rd Floor">
-
-  <label>
-    <input type="checkbox" id="isCommonArea" style="width:auto; display:inline-block;">
-    This is a common area (corridor, washroom, lab, etc.)
-  </label>
-
-  <div id="roomWrapper">
-    <label for="roomNumber">Room Number</label>
-    <input type="text" id="roomNumber" placeholder="e.g. 304">
+<section class="card">
+  <button class="toggle" id="reportToggle" type="button" aria-expanded="false" aria-controls="reportForm">
+    <span class="plus" aria-hidden="true">+</span>
+    <span><b>Report an issue</b><span class="meta">Add a photo and location so it gets fixed faster</span></span>
+  </button>
+  <div id="reportForm">
+    <div class="field" role="radiogroup" aria-labelledby="catL"><span class="legend" id="catL">What needs fixing?</span><div class="chips" id="categoryChips"></div></div>
+    <div class="two">
+      <div class="field"><label for="building">Building</label><input type="text" id="building" placeholder="e.g. Tech Park" autocomplete="off"></div>
+      <div class="field"><label for="floor">Floor</label><input type="text" id="floor" placeholder="e.g. 3rd Floor" autocomplete="off"></div>
+    </div>
+    <div class="field"><label class="switch"><input type="checkbox" id="isCommonArea"><span>Common area (corridor, washroom, lab, etc.)</span></label></div>
+    <div class="field" id="roomWrapper"><label for="roomNumber">Room number</label><input type="text" id="roomNumber" placeholder="e.g. 304" autocomplete="off"></div>
+    <div class="field"><label for="description">Description <span class="opt">(optional)</span></label><textarea id="description" placeholder="What's wrong? Anything the technician should know?"></textarea></div>
+    <div class="field"><span class="legend">Photo</span>
+      <label class="drop" id="dropzone"><input type="file" id="photo" accept="image/jpeg,image/png,image/webp"><span class="dz">Tap to take or choose a photo<br><small>JPEG, PNG or WebP, up to 5 MB</small></span><img id="preview" alt="Selected photo preview"></label></div>
+    <button class="send" id="submitBtn" type="button">Submit ticket</button>
+    <div id="submitMsg" role="status"></div>
   </div>
-
-  <label for="description">Description (optional)</label>
-  <textarea id="description" placeholder="Briefly describe the issue"></textarea>
-
-  <label for="photo">Photo</label>
-  <input type="file" id="photo" accept="image/jpeg,image/png,image/webp">
-
-  <button id="submitBtn">Submit Ticket</button>
-  <div id="submitMsg"></div>
-</div>
-
-<section class="updates-section" aria-labelledby="updatesHeading">
-  <h3 id="updatesHeading">Status Updates</h3>
-  <div id="statusUpdates" aria-live="polite">Loading updates...</div>
 </section>
 
-<h3>Status</h3>
+<section class="card">
+  <h2>Ticket Overview</h2>
+  <div class="tiles" id="tiles"></div>
+  <div class="ups" id="statusUpdates" aria-live="polite">Loading updates...</div>
+</section>
+
+<div class="filters">
+  <input id="q" type="search" placeholder="Search description, room, building" aria-label="Search tickets">
+  <select id="so" aria-label="Sort"><option value="new">Newest first</option><option value="old">Oldest first</option></select>
+  <select id="fs" aria-label="Status"><option value="">All Statuses</option></select>
+</div>
 <div id="ticketList">Loading...</div>
 
+<div id="scrim"></div><aside id="drawer" aria-label="Ticket details"></aside><div id="toast" role="status"></div>
+<div class="switcher" role="group" aria-label="Layout"><i class="slider"></i>
+  <button data-l="list" aria-pressed="true">List</button><button data-l="gallery" aria-pressed="false">Gallery</button></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="pwa-install.js"></script>
 <script>
-let currentUserId = null;
+const $=s=>document.querySelector(s),H=36e5;
+const CAT={wifi:"WiFi",furniture:"Furniture",ac:"AC",electrical:"Electrical",smartboards_mics:"Smartboards & Mics",plumbing:"Plumbing",cleaning:"Cleaning"};
+const ICON={wifi:"📶",furniture:"🪑",ac:"❄️",electrical:"💡",smartboards_mics:"🎤",plumbing:"🚰",cleaning:"🧹"};
+const ST={open:"Open",in_progress:"In Progress",resolved:"Resolved",rejected:"Rejected"};
+const STC={open:"#C73532",in_progress:"#F3D77B",resolved:"#AFCDE0",rejected:"#c9c3b5"};
+let uid=null,tickets=[],events=[],shown=new Set(),prevSt={},fresh=new Set(),openId=null,first=true,loaded=false,showAll=false,pv=[];
+const RM=matchMedia("(prefers-reduced-motion: reduce)").matches,anim=(el,k,o)=>RM||!el?0:el.animate(k,o);
+const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const active=t=>t.status==="open"||t.status==="in_progress";
+const loc=t=>`${t.building}, ${t.floor}${t.is_common_area?" (Common Area)":", Room "+(t.room_number||"-")}`;
+const when=x=>new Date(x).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+const fmt=ms=>{const h=Math.floor(ms/H);return h<1?"<1h":h<48?h+"h":Math.floor(h/24)+"d "+h%24+"h"};
+const ageOf=t=>Date.now()-new Date(t.created_at);
+function resolvedIn(t){const e=events.find(x=>x.ticket_id===t.id&&x.new_status==="resolved");return e?new Date(e.created_at)-new Date(t.created_at):null}
+function toast(m){const e=$("#toast");e.textContent=m;e.classList.remove("on");void e.offsetWidth;e.classList.add("on");clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove("on"),2600)}
 
-const categoryLabels = {
-  wifi: "WiFi", furniture: "Furniture", ac: "AC", electrical: "Electrical",
-  smartboards_mics: "Smartboards & Mics", plumbing: "Plumbing", cleaning: "Cleaning"
-};
-const statusLabels = {
-  open: "Open", in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected"
-};
+/* ---- form ---- */
+$("#categoryChips").innerHTML=Object.keys(CAT).map((k,i)=>`<label class="chip"><input type="radio" name="category" value="${k}" ${i?"":"checked"}><span><span aria-hidden="true">${ICON[k]}</span>${esc(CAT[k])}</span></label>`).join("");
+$("#reportToggle").onclick=()=>{const o=$("#reportForm").classList.toggle("open");$("#reportToggle").setAttribute("aria-expanded",o)};
+$("#isCommonArea").onchange=e=>{$("#roomWrapper").style.display=e.target.checked?"none":"block"};
+$("#photo").onchange=e=>{const f=e.target.files[0],p=$("#preview");if(!f){$("#dropzone").classList.remove("has");return}
+  if(p.src.startsWith("blob:"))URL.revokeObjectURL(p.src);p.src=URL.createObjectURL(f);$("#dropzone").classList.add("has")};
 
-document.getElementById("isCommonArea").addEventListener("change", (e) => {
-  document.getElementById("roomWrapper").style.display = e.target.checked ? "none" : "block";
-});
+/* ---- data ---- */
+async function init(){const s=await requireAuth();if(!s)return;uid=s.user.id;await reload();
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()})}
+async function reload(){
+  const [t,e]=await Promise.all([
+    supabaseClient.from("tickets").select("*").eq("student_id",uid).order("created_at",{ascending:false}),
+    supabaseClient.from("ticket_status_events").select("id, ticket_id, old_status, new_status, created_at, tickets(category, building, floor, room_number, is_common_area)").eq("student_id",uid).order("created_at",{ascending:false}).limit(50)]);
+  if(t.error){$("#ticketList").innerHTML=`<p class="error">Couldn't load tickets: ${esc(t.error.message)}</p>`;return}
+  if(e.error)$("#statusUpdates").innerHTML=`<p class="error">Couldn't load updates: ${esc(e.error.message)}</p>`;
+  if(loaded)t.data.forEach(x=>{if(!shown.has(x.id))fresh.add(x.id)});
+  tickets=t.data;events=e.data||[];loaded=true;view()}
 
-async function init() {
-  const session = await requireAuth();
-  if (!session) return;
-  currentUserId = session.user.id;
+/* ---- render ---- */
+function card(t){const r=resolvedIn(t),late=active(t)&&ageOf(t)>48*H;
+  return `<article class="ticket" data-id="${t.id}"><img src="${esc(t.photo_url)}" alt="Photo of the reported issue" loading="lazy"><div class="ticket-body">
+  <div><strong>${esc(CAT[t.category]||t.category)}</strong><span class="badge badge-${esc(t.status)}">${esc(ST[t.status]||t.status)}</span><span class="age ${late?"late":""}">${r!=null?"Resolved in "+fmt(r):active(t)?fmt(ageOf(t))+" open":""}</span></div>
+  <div class="ticket-meta">${esc(loc(t))}</div>${t.description?`<div class="ticket-meta">${esc(t.description)}</div>`:""}
+  <div class="ticket-meta">Submitted ${when(t.created_at)}</div>
+  <div class="row"><button class="ghost" data-act="open">Details</button></div></div></article>`}
+function view0(){const q=$("#q").value.toLowerCase(),fs=$("#fs").value,so=$("#so").value;
+  const L=tickets.filter(t=>(!fs||t.status===fs)&&(!q||[t.description,t.room_number,t.building,t.floor,CAT[t.category]].join(" ").toLowerCase().includes(q)))
+    .sort((a,b)=>so==="old"?new Date(a.created_at)-new Date(b.created_at):new Date(b.created_at)-new Date(a.created_at));
+  $("#ticketList").innerHTML=L.length?L.map(card).join(""):`<p class="empty">${tickets.length?"No tickets match. Clear a filter or search term.":"No tickets yet. Use Report an issue above to submit your first one."}</p>`;
+  const A=tickets.filter(active).length,R=tickets.filter(t=>t.status==="resolved").length,O=tickets.filter(t=>active(t)&&ageOf(t)>48*H).length;
+  $("#tiles").innerHTML=`<div class="tile"><b>${A}</b><span>Active tickets</span></div><div class="tile"><b>${R}</b><span>Resolved</span></div><div class="tile ${O?"warn":""}"><b>${O}</b><span>Open over 48 hours</span></div>`;
+  countUp();
+  const ev=showAll?events:events.slice(0,3);
+  $("#statusUpdates").innerHTML=events.length?ev.map(x=>{const t=x.tickets;return `<div class="up"><i class="dot" style="--c:${STC[x.new_status]||"#ccc"}"></i><div><b>${esc(CAT[t?.category]||"Ticket")}</b>: ${esc(ST[x.old_status]||x.old_status)} to ${esc(ST[x.new_status]||x.new_status)}<div class="meta">${t?esc(loc(t))+" · ":""}${when(x.created_at)}</div></div></div>`}).join("")+(events.length>3?`<button class="ghost more" data-act="more">${showAll?"Show fewer":"Show all "+events.length+" updates"}</button>`:""):`<p class="empty">No status updates yet.</p>`;
+  if(openId)drawer(openId,true)}
+function drawer(id,keep){const t=tickets.find(x=>x.id===id);if(!t)return;openId=id;$("#drawer").dataset.anim=keep?"":"1";
+  const tl=[...events.filter(x=>x.ticket_id===id).map(x=>({t:x.created_at,txt:`Status changed: ${ST[x.old_status]||x.old_status} to ${ST[x.new_status]||x.new_status}`})),{t:t.created_at,txt:"Ticket submitted"}];
+  $("#drawer").innerHTML=`<button class="ghost" data-act="close">Close</button><h2 style="margin-top:14px">${esc(CAT[t.category]||t.category)} <span class="badge badge-${esc(t.status)}" style="font-family:var(--font);vertical-align:6px">${esc(ST[t.status]||t.status)}</span></h2>
+  <div class="ticket-meta">${esc(loc(t))}</div>${t.description?`<div class="ticket-meta">${esc(t.description)}</div>`:""}<img src="${esc(t.photo_url)}" alt="Photo of the reported issue">
+  <h3 style="font:400 22px var(--display);letter-spacing:.03em;margin:8px 0 0">Timeline</h3><ul class="tl">${tl.map((e,i)=>`<li style="--k:${i}">${esc(e.txt)}<small>${when(e.t)}</small></li>`).join("")}</ul>`;
+  $("#drawer").classList.add("open");$("#scrim").classList.add("on")}
+function closeDrawer(){openId=null;$("#drawer").classList.remove("open");$("#scrim").classList.remove("on")}
+document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(e.target.id==="scrim")return closeDrawer();if(!el)return;const a=el.dataset.act;
+  if(a==="open")drawer(+el.closest("[data-id]").dataset.id);else if(a==="close")closeDrawer();else if(a==="more"){showAll=!showAll;view()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
+["q","so","fs"].forEach(i=>$("#"+i).addEventListener(i==="q"?"input":"change",view));
+$("#fs").innerHTML+=Object.entries(ST).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
 
-  await Promise.all([loadTickets(), loadStatusUpdates()]);
-}
+/* ---- motion ---- */
+function flip(fn){const P=new Map();document.querySelectorAll("#ticketList .ticket").forEach(e=>P.set(e.dataset.id,e.getBoundingClientRect()));fn();
+  if(RM)return;document.querySelectorAll("#ticketList .ticket").forEach(e=>{const o=P.get(e.dataset.id);if(!o)return;const n=e.getBoundingClientRect(),dx=o.left-n.left,dy=o.top-n.top;
+    if(dx||dy)e.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:"none"}],{duration:420,easing:"cubic-bezier(.2,.8,.2,1)"})})}
+function view(){flip(()=>{view0();enhance()});post()}
+function post(){const ids=new Set();let n=0;
+  document.querySelectorAll("#ticketList .ticket").forEach(el=>{const id=+el.dataset.id,t=tickets.find(x=>x.id===id);ids.add(id);
+    if(!shown.has(id)){el.classList.add("enter");el.style.setProperty("--i",Math.min(n++,10));if(fresh.has(id))el.classList.add("fresh")}
+    else if(prevSt[id]&&prevSt[id]!==t.status){const c=STC[t.status],s=document.body.dataset.layout==="gallery"?"borderTopColor":"borderLeftColor";
+      anim(el,[{[s]:STC[prevSt[id]],boxShadow:`0 0 0 6px ${c}77,0 6px 18px -10px rgba(34,38,47,.22)`},{}],{duration:700,easing:"ease-out"});
+      anim(el.querySelector(".badge"),[{transform:"scale(.5)",opacity:0},{transform:"scale(1.25)",opacity:1},{transform:"scale(1)"}],{duration:450,easing:"cubic-bezier(.3,1.5,.5,1)"});
+      toast(`${CAT[t.category]||"Ticket"} is now ${ST[t.status]}`)}
+    prevSt[id]=t.status});
+  shown=new Set([...shown,...ids]);fresh.clear()}
+function countUp(){document.querySelectorAll("#tiles .tile b").forEach((b,i)=>{const to=+b.textContent,from=first?0:(pv[i]??to);pv[i]=to;
+  if(RM||from===to)return;const s=performance.now();(function f(now){const p=Math.min(1,(now-s)/900);b.textContent=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(s)});first=false}
+function slide(){const b=document.querySelector(".switcher [aria-pressed=true]"),s=$(".slider");s.style.left=b.offsetLeft+"px";s.style.width=b.offsetWidth+"px"}
+document.querySelectorAll(".switcher [data-l]").forEach(b=>b.onclick=()=>{flip(()=>{document.body.dataset.layout=b.dataset.l});
+  document.querySelectorAll(".switcher [data-l]").forEach(x=>x.setAttribute("aria-pressed",x===b));slide()});
+slide();addEventListener("resize",slide);document.fonts&&document.fonts.ready.then(slide);
 
-async function loadStatusUpdates() {
-  const updatesEl = document.getElementById("statusUpdates");
-  const { data, error } = await supabaseClient
-    .from("ticket_status_events")
-    .select("id, old_status, new_status, created_at, tickets(category, building, floor, room_number, is_common_area)")
-    .eq("student_id", currentUserId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+/* ---- custom dropdowns (filters) ---- */
+const DD={s:null,i:-1},menu=document.createElement("div");menu.id="ddmenu";menu.setAttribute("role","listbox");document.body.appendChild(menu);
+const CHEV='<svg class="chev" width="12" height="8" viewBox="0 0 12 8"><path d="M1 1.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+ CHK='<svg class="chk" width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+ lead=(s,o)=>s.id==="fs"?`<i class="dot${STC[o.value]?"":" ring"}" style="--c:${STC[o.value]||"transparent"}"></i>`:"";
+function sync(s){const o=s.selectedOptions[0]||s.options[0];s._b.querySelector(".lbl").innerHTML=lead(s,o)+`<span>${esc(o.textContent)}</span>`}
+function enhance(){document.querySelectorAll("select:not([data-dd])").forEach(s=>{s.dataset.dd=1;const w=document.createElement("span");w.className="dd";
+  w.innerHTML=`<button type="button" class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(s.getAttribute("aria-label"))}"><span class="lbl"></span>${CHEV}</button>`;
+  s.after(w);s._b=w.firstChild;s._b.onclick=()=>DD.s===s?closeMenu():openMenu(s);sync(s)})}
+function hl(i,sc){DD.i=i;[...menu.children].forEach((e,j)=>e.classList.toggle("hl",j===i));const e=menu.children[i];if(sc&&e)e.scrollIntoView({block:"nearest"})}
+function openMenu(s){closeMenu(1);DD.s=s;
+  menu.innerHTML=[...s.options].map((o,i)=>`<div class="dd-opt" role="option" data-i="${i}" style="--k:${i}" aria-selected="${i===s.selectedIndex}">${lead(s,o)}<span class="t">${esc(o.textContent)}</span>${CHK}</div>`).join("");
+  menu.className="";menu.style.display="block";menu.style.visibility="hidden";
+  const r=s._b.getBoundingClientRect();menu.style.minWidth=Math.max(r.width,190)+"px";
+  const h=menu.offsetHeight,mw=menu.offsetWidth,below=innerHeight-r.bottom-10,up=below<h&&r.top>below;
+  menu.style.left=Math.max(8,Math.min(r.left,innerWidth-mw-8))+"px";menu.style.top=(up?Math.max(8,r.top-h-6):r.bottom+6)+"px";
+  menu.style.visibility="";menu.className="open";s._b.setAttribute("aria-expanded","true");hl(s.selectedIndex,1)}
+function closeMenu(now){const s=DD.s;if(!s)return;DD.s=null;s._b.setAttribute("aria-expanded","false");
+  if(now){menu.style.display="none";menu.className="";return}
+  menu.className="out";setTimeout(()=>{if(!DD.s){menu.style.display="none";menu.className=""}},130)}
+function pick(i){const s=DD.s;if(!s||i<0)return;const ch=s.selectedIndex!==i;closeMenu();if(!ch)return;s.selectedIndex=i;sync(s);s.dispatchEvent(new Event("change",{bubbles:true}))}
+menu.addEventListener("mousedown",e=>e.preventDefault());
+menu.addEventListener("click",e=>{const o=e.target.closest(".dd-opt");o&&pick(+o.dataset.i)});
+menu.addEventListener("mouseover",e=>{const o=e.target.closest(".dd-opt");o&&hl(+o.dataset.i)});
+document.addEventListener("mousedown",e=>{if(DD.s&&!menu.contains(e.target)&&!DD.s._b.contains(e.target))closeMenu()});
+addEventListener("scroll",e=>{if(DD.s&&!menu.contains(e.target))closeMenu()},true);addEventListener("resize",()=>closeMenu(1));
+document.addEventListener("keydown",e=>{
+  if(!DD.s){const b=e.target.closest&&e.target.closest(".dd-btn");if(b&&(e.key==="ArrowDown"||e.key==="ArrowUp")){e.preventDefault();b.click()}return}
+  const n=DD.s.options.length;
+  if(e.key==="Escape"){e.stopImmediatePropagation();const b=DD.s._b;closeMenu();b.focus()}
+  else if(e.key==="ArrowDown"){e.preventDefault();hl((DD.i+1)%n,1)}
+  else if(e.key==="ArrowUp"){e.preventDefault();hl((DD.i-1+n)%n,1)}
+  else if(e.key==="Enter"||e.key===" "){e.preventDefault();pick(DD.i)}
+  else if(e.key==="Tab")closeMenu()},true);
 
-  if (error) {
-    updatesEl.innerHTML = `<p class="error">Could not load updates: ${escapeHtml(error.message)}</p>`;
-    return;
-  }
-  if (!data.length) {
-    updatesEl.innerHTML = `<p class="ticket-meta">No status updates yet.</p>`;
-    return;
-  }
-
-  updatesEl.innerHTML = data.map(event => {
-    const ticket = event.tickets;
-    const location = ticket
-      ? `${ticket.building}, ${ticket.floor}${ticket.is_common_area ? " (Common Area)" : `, Room ${ticket.room_number || "-"}`}`
-      : "Ticket";
-    return `
-      <article class="status-update">
-        <strong>${escapeHtml(categoryLabels[ticket?.category] || "Ticket")} status changed</strong>
-        <div class="ticket-meta">${escapeHtml(location)}</div>
-        <div class="ticket-meta">${statusLabels[event.old_status]} → ${statusLabels[event.new_status]}</div>
-        <div class="ticket-meta">${new Date(event.created_at).toLocaleString()}</div>
-      </article>
-    `;
-  }).join("");
-}
-
-async function loadTickets() {
-  const listEl = document.getElementById("ticketList");
-  const { data, error } = await supabaseClient
-    .from("tickets")
-    .select("*")
-    .eq("student_id", currentUserId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    listEl.innerHTML = `<div class="error">Failed to load tickets: ${error.message}</div>`;
-    return;
-  }
-
-  if (!data.length) {
-    listEl.innerHTML = `<p style="color:#666;">No tickets yet. Submit one above.</p>`;
-    return;
-  }
-
-  listEl.innerHTML = data.map(t => `
-    <div class="ticket">
-      <img src="${t.photo_url}" alt="ticket photo">
-      <div class="ticket-body">
-        <strong>${categoryLabels[t.category] || t.category}</strong>
-        <span class="badge badge-${t.status}">${statusLabels[t.status] || t.status}</span>
-        <div class="ticket-meta">${t.building}, ${t.floor}${t.is_common_area ? " (Common Area)" : ", Room " + (t.room_number || "-")}</div>
-        ${t.description ? `<div class="ticket-meta">${escapeHtml(t.description)}</div>` : ""}
-        <div class="ticket-meta">Submitted ${new Date(t.created_at).toLocaleString()}</div>
-      </div>
-    </div>
-  `).join("");
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-document.getElementById("submitBtn").addEventListener("click", async () => {
-  const category = document.getElementById("category").value;
-  const building = document.getElementById("building").value.trim();
-  const floor = document.getElementById("floor").value.trim();
-  const isCommonArea = document.getElementById("isCommonArea").checked;
-  const roomNumber = document.getElementById("roomNumber").value.trim();
-  const description = document.getElementById("description").value.trim();
-  const photoInput = document.getElementById("photo");
-  const msg = document.getElementById("submitMsg");
-  const btn = document.getElementById("submitBtn");
-
-  msg.textContent = "";
-
-  if (!building || !floor) {
-    msg.textContent = "Building and floor are required.";
-    msg.className = "error";
-    return;
-  }
-  if (!isCommonArea && !roomNumber) {
-    msg.textContent = "Room number is required unless this is a common area.";
-    msg.className = "error";
-    return;
-  }
-  if (!photoInput.files[0]) {
-    msg.textContent = "A photo is required.";
-    msg.className = "error";
-    return;
-  }
-
-  const file = photoInput.files[0];
-  const allowedPhotoTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedPhotoTypes.includes(file.type)) {
-    msg.textContent = "Choose a JPEG, PNG, or WebP image.";
-    msg.className = "error";
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    msg.textContent = "Photo must be under 5MB.";
-    msg.className = "error";
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = "Submitting...";
-
-  // Upload photo to storage first.
-  const filePath = `${currentUserId}/${Date.now()}_${file.name}`;
-  const { error: uploadError } = await supabaseClient.storage
-    .from("ticket-photos")
-    .upload(filePath, file);
-
-  if (uploadError) {
-    msg.textContent = `Photo upload failed: ${uploadError.message}`;
-    msg.className = "error";
-    btn.disabled = false;
-    btn.textContent = "Submit Ticket";
-    return;
-  }
-
-  const { data: urlData } = supabaseClient.storage
-    .from("ticket-photos")
-    .getPublicUrl(filePath);
-
-  const { error: insertError } = await supabaseClient.from("tickets").insert({
-    student_id: currentUserId,
-    photo_url: urlData.publicUrl,
-    category,
-    building,
-    floor,
-    is_common_area: isCommonArea,
-    room_number: isCommonArea ? null : roomNumber,
-    description: description || null
-  });
-
-  btn.disabled = false;
-  btn.textContent = "Submit Ticket";
-
-  if (insertError) {
-    msg.textContent = `Failed to create ticket: ${insertError.message}`;
-    msg.className = "error";
-    return;
-  }
-
-  msg.textContent = "Ticket submitted.";
-  msg.className = "success";
-  document.getElementById("building").value = "";
-  document.getElementById("floor").value = "";
-  document.getElementById("roomNumber").value = "";
-  document.getElementById("description").value = "";
-  document.getElementById("isCommonArea").checked = false;
-  document.getElementById("roomWrapper").style.display = "block";
-  photoInput.value = "";
-
-  await loadTickets();
-});
+/* ---- submit ---- */
+async function shrink(f){try{const b=await createImageBitmap(f,{imageOrientation:"from-image"}),k=Math.min(1,1280/Math.max(b.width,b.height)),c=document.createElement("canvas");
+  c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);c.getContext("2d").drawImage(b,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(x=>r(x||f),"image/jpeg",.8))}catch(_){return f}}
+$("#submitBtn").addEventListener("click",async()=>{
+  const category=document.querySelector('input[name="category"]:checked').value,building=$("#building").value.trim(),floor=$("#floor").value.trim(),
+   isCommonArea=$("#isCommonArea").checked,roomNumber=$("#roomNumber").value.trim(),description=$("#description").value.trim(),
+   file=$("#photo").files[0],msg=$("#submitMsg"),btn=$("#submitBtn");
+  const fail=t=>{msg.textContent=t;msg.className="error"};msg.textContent="";
+  if(!building||!floor)return fail("Enter the building and floor.");
+  if(!isCommonArea&&!roomNumber)return fail("Enter a room number, or tick common area.");
+  if(!file)return fail("Add a photo of the issue.");
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type))return fail("Choose a JPEG, PNG or WebP image.");
+  if(file.size>5*1024*1024)return fail("Photo must be under 5 MB.");
+  btn.disabled=true;btn.textContent="Submitting...";const reset=()=>{btn.disabled=false;btn.textContent="Submit ticket"};
+  const blob=await shrink(file),base=file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9-]/g,"_");
+  const path=`${uid}/${Date.now()}_${base}.jpg`;
+  const up=await supabaseClient.storage.from("ticket-photos").upload(path,blob,{contentType:"image/jpeg"});
+  if(up.error){reset();return fail(`Photo upload failed: ${up.error.message}`)}
+  const {data:u}=supabaseClient.storage.from("ticket-photos").getPublicUrl(path);
+  const ins=await supabaseClient.from("tickets").insert({student_id:uid,photo_url:u.publicUrl,category,building,floor,is_common_area:isCommonArea,room_number:isCommonArea?null:roomNumber,description:description||null});
+  reset();if(ins.error)return fail(`Couldn't create ticket: ${ins.error.message}`);
+  ["building","floor","roomNumber","description"].forEach(i=>$("#"+i).value="");
+  $("#isCommonArea").checked=false;$("#roomWrapper").style.display="block";$("#photo").value="";$("#dropzone").classList.remove("has");
+  $("#reportForm").classList.remove("open");$("#reportToggle").setAttribute("aria-expanded","false");
+  toast("Ticket submitted");await reload()});
 
 init();
 </script>
-
 </body>
 </html>
