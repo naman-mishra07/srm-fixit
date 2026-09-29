@@ -123,16 +123,6 @@
 .auth-page .developer-footer { margin-top: 30px; text-align: center; animation: auth-rise .5s .36s both; }
 .auth-page .developer-footer a { color: var(--muted); font-size: 11px; text-decoration: none; }
 .auth-page .developer-footer a:hover { color: var(--blue-deep); text-decoration: underline; }
-.auth-page .preview-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; animation-delay: .3s; }
-.auth-page .preview-links > div { grid-column: 1 / -1; }
-.auth-page .preview-links h2 { margin: 0 0 3px; }
-.auth-page .preview-links p { margin: 0 0 5px; color: var(--muted); font-size: 14px; }
-.auth-page .preview-links .preview-kicker { margin-bottom: 2px; color: var(--blue-deep); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.auth-page .preview-button { display: flex; min-height: 46px; align-items: center; justify-content: center; padding: 10px 13px; border-radius: 999px; background: var(--yellow); color: var(--ink); font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; transition: transform .15s, filter .15s, box-shadow .15s; }
-.auth-page .preview-button:hover { transform: translateY(-1px); filter: brightness(1.04); box-shadow: 0 5px 12px rgba(34,38,47,.12); }
-.auth-page .preview-button:active { transform: translateY(1px) scale(.985); }
-.auth-page .preview-button.secondary { background: var(--blue-soft); color: var(--blue-deep); box-shadow: inset 0 0 0 1px rgba(47,95,128,.18); }
-.auth-page .preview-shortcut { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 16px 0; }
 
 @keyframes auth-rise { from { opacity: 0; transform: translateY(14px); } }
 @keyframes auth-drop { from { opacity: 0; transform: translateY(-12px); } }
@@ -148,9 +138,6 @@
   .auth-page { padding-right: 14px; padding-left: 14px; }
   .auth-page h1 { font-size: 38px; }
   .auth-page .card { padding: 18px; border-radius: 16px; }
-  .auth-page .preview-links { grid-template-columns: 1fr; }
-  .auth-page .preview-links > div { grid-column: auto; }
-  .auth-page .preview-shortcut { grid-template-columns: 1fr; }
 }
 
 /* Existing shared components retained for the student ticket screen. */

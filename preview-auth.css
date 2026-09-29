@@ -1,7 +1,0 @@
-.preview-banner { margin: 0 0 16px; padding: 10px 13px; border: 1px solid #e5d394; border-radius: 12px; background: #FBF0C8; color: #7a5c05; font-size: 14px; font-weight: 600; }
-.preview-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.preview-actions .preview-button { display: flex; min-height: 46px; align-items: center; justify-content: center; padding: 10px 13px; border-radius: 999px; background: #F3D77B; color: #22262f; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; }
-.preview-actions .preview-button.secondary { background: #E3EEF5; color: #2f5f80; }
-.preview-actions .preview-button:hover { filter: brightness(1.04); }
-.preview-form-button { pointer-events: none; opacity: .72; }
-@media (max-width: 560px) { .preview-actions { grid-template-columns: 1fr; } }
