@@ -40,7 +40,7 @@ Set the project URL and publishable key in `supabase-client.js`. The publishable
 
 After Phase 6, the staff dashboard shows a reporter's verified college email and, when entered, the student's registration number. A resolved ticket includes a mail link that opens a prefilled resolution email draft; staff still review and send it from their email client. Registration numbers are provided by users and are not verified by SRM Academia.
 
-After Phase 7, staff submit a completion note and may attach an after-photo. The ticket waits for its reporter, who can confirm the repair or reopen it with a reason. Only reporter confirmation marks it resolved. Resolution photos are stored privately and visible only to staff and the ticket reporter. Run the migration in Supabase before using this workflow; old staff status updates no longer write directly to the status column.
+After Phase 7, staff submit a completion note and may attach an after-photo. The ticket waits for its reporter, who can confirm the repair or reopen it with an inline reason form. Only reporter confirmation marks it resolved. Resolution photos are stored privately and visible only to staff and the ticket reporter. Run the migration in Supabase before using this workflow; old staff status updates no longer write directly to the status column.
 
 Resolved tickets are hidden from the active staff dashboard and available from its **Resolved archive** button.
 

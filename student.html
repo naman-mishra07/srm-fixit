@@ -96,6 +96,7 @@ select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid va
 .age.late{color:#fff;background:var(--red);padding:1px 9px;border-radius:99px}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .resolution-note{display:grid;gap:5px;margin-top:10px;padding:12px;background:var(--yellow-soft);border-radius:12px}.resolution-note p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.resolution-note a{color:var(--blue-deep);font-weight:700}
+.reopen-form{display:grid;gap:8px;margin-top:10px;padding:12px;background:var(--red-soft);border-radius:12px}.reopen-form label{font-weight:700;font-size:14px}.reopen-form textarea{min-height:72px}.reopen-form .row{margin-top:0}
 .empty{color:var(--muted);padding:6px 0}
 body[data-layout=gallery] #ticketList{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
 body[data-layout=gallery] .ticket{flex-direction:column;gap:0;padding:0;overflow:hidden;border-left-width:1px;border-top:6px solid var(--line)}
@@ -223,7 +224,7 @@ const CAT={wifi:"WiFi",furniture:"Furniture",ac:"AC",electrical:"Electrical",sma
 const ICON={wifi:"📶",furniture:"🪑",ac:"❄️",electrical:"💡",smartboards_mics:"🎤",plumbing:"🚰",cleaning:"🧹"};
 const ST={open:"Open",in_progress:"In Progress",awaiting_confirmation:"Awaiting Confirmation",resolved:"Resolved",rejected:"Rejected"};
 const STC={open:"#C73532",in_progress:"#F3D77B",awaiting_confirmation:"#F3D77B",resolved:"#AFCDE0",rejected:"#c9c3b5"};
-let uid=null,tickets=[],events=[],resolutionEvents=[],resolutionPhotoUrls=new Map(),shown=new Set(),prevSt={},fresh=new Set(),openId=null,first=true,loaded=false,showAll=false,pv=[];
+let uid=null,tickets=[],events=[],resolutionEvents=[],resolutionPhotoUrls=new Map(),shown=new Set(),prevSt={},fresh=new Set(),openId=null,reopeningId=null,first=true,loaded=false,showAll=false,pv=[];
 const RM=matchMedia("(prefers-reduced-motion: reduce)").matches,anim=(el,k,o)=>RM||!el?0:el.animate(k,o);
 const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const active=t=>t.status==="open"||t.status==="in_progress"||t.status==="awaiting_confirmation";
@@ -278,7 +279,7 @@ function card(t){const r=resolvedIn(t),late=active(t)&&ageOf(t)>48*H,latest=reso
   <div class="ticket-meta">${esc(loc(t))}</div>${t.description?`<div class="ticket-meta">${esc(t.description)}</div>`:""}
   <div class="ticket-meta">Submitted ${when(t.created_at)}</div>
   ${latest?`<section class="resolution-note"><strong>Staff completion note</strong><p>${esc(latest.resolution_note||"")}</p>${latest.evidence_path&&resolutionPhotoUrls.has(latest.evidence_path)?`<a href="${esc(resolutionPhotoUrls.get(latest.evidence_path))}" target="_blank" rel="noopener">View after photo</a>`:""}</section>`:""}
-  ${t.status==="awaiting_confirmation"?`<div class="row"><button data-act="confirm-resolution">Confirm fixed</button><button class="ghost" data-act="reopen-resolution">Reopen issue</button></div>`:""}
+  ${t.status==="awaiting_confirmation"?`<div class="row"><button data-act="confirm-resolution">Confirm fixed</button><button class="ghost" data-act="start-reopen">Reopen issue</button></div>${reopeningId===t.id?`<section class="reopen-form"><label for="reopen-reason-${t.id}">What still needs attention?</label><textarea id="reopen-reason-${t.id}" data-reopen-reason maxlength="1000" placeholder="Explain what is still not fixed (at least 5 characters)"></textarea><div class="row"><button data-act="reopen-resolution">Send reopen request</button><button class="ghost" data-act="cancel-reopen">Cancel</button></div></section>`:""}`:""}
   <div class="row"><button class="ghost" data-act="open">Details</button></div></div></article>`}
 function view0(){const q=$("#q").value.toLowerCase(),fs=$("#fs").value,so=$("#so").value;
   const L=tickets.filter(t=>(!fs||t.status===fs)&&(!q||[t.description,t.room_number,t.building,t.floor,CAT[t.category]].join(" ").toLowerCase().includes(q)))
@@ -299,8 +300,10 @@ function drawer(id,keep){const t=tickets.find(x=>x.id===id);if(!t)return;openId=
 function closeDrawer(){openId=null;$("#drawer").classList.remove("open");$("#scrim").classList.remove("on")}
 document.addEventListener("click",async e=>{const el=e.target.closest("[data-act]");if(e.target.id==="scrim")return closeDrawer();if(!el)return;const a=el.dataset.act,id=el.closest("[data-id]")?.dataset.id;
   if(a==="open")drawer(id);else if(a==="close")closeDrawer();else if(a==="more"){showAll=!showAll;view()}
-  else if(a==="confirm-resolution"&&id){if(!confirm("Confirm that this issue has been fixed?"))return;const {error}=await supabaseClient.rpc("student_confirm_ticket_resolution",{target_ticket_id:id});if(error)toast(error.message);else{toast("Thanks for confirming the repair.");await reload()}}
-  else if(a==="reopen-resolution"&&id){const reason=prompt("What still needs attention? (At least 5 characters)");if(reason===null)return;const {error}=await supabaseClient.rpc("student_reopen_ticket_resolution",{target_ticket_id:id,reopen_reason:reason});if(error)toast(error.message);else{toast("Ticket reopened for staff.");await reload()}}});
+  else if(a==="confirm-resolution"&&id){el.disabled=true;const {error}=await supabaseClient.rpc("student_confirm_ticket_resolution",{target_ticket_id:id});if(error){toast(error.message);el.disabled=false}else{toast("Thanks for confirming the repair.");reopeningId=null;await reload()}}
+  else if(a==="start-reopen"&&id){reopeningId=id;view()}
+  else if(a==="cancel-reopen"){reopeningId=null;view()}
+  else if(a==="reopen-resolution"&&id){const reason=el.closest("[data-id]")?.querySelector("[data-reopen-reason]")?.value.trim()||"";if(reason.length<5){toast("Please explain what still needs attention (at least 5 characters).",true);return}el.disabled=true;const {error}=await supabaseClient.rpc("student_reopen_ticket_resolution",{target_ticket_id:id,reopen_reason:reason});if(error){toast(error.message);el.disabled=false}else{toast("Ticket reopened for staff.");reopeningId=null;await reload()}}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
 ["q","so","fs"].forEach(i=>$("#"+i).addEventListener(i==="q"?"input":"change",view));
 $("#fs").innerHTML+=Object.entries(ST).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
