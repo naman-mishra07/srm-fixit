@@ -4,12 +4,16 @@ const CATEGORY = {
   wifi: "WiFi", furniture: "Furniture", ac: "AC", electrical: "Electrical",
   smartboards_mics: "Smartboards & Mics", plumbing: "Plumbing", cleaning: "Cleaning"
 };
-const STATUS = { open: "Open", in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected" };
+const STATUS = { open: "Open", in_progress: "In Progress", awaiting_confirmation: "Awaiting Confirmation", resolved: "Resolved", rejected: "Rejected" };
+const STAFF_STATUS = { open: "Open", in_progress: "In Progress", rejected: "Rejected" };
 let tickets = [];
 let staff = [];
 let profiles = new Map();
 let statusEvents = [];
 let assignmentEvents = [];
+let resolutionEvents = [];
+let resolutionPhotoUrls = new Map();
+let resolutionSchemaReady = false;
 let duplicateCounts = new Map();
 let selected = new Set();
 let freshIds = new Set();
@@ -59,7 +63,7 @@ function elapsedLabel(start, end = Date.now()) {
 }
 
 function isActive(ticket) {
-  return ticket.status === "open" || ticket.status === "in_progress";
+  return ticket.status === "open" || ticket.status === "in_progress" || ticket.status === "awaiting_confirmation";
 }
 
 function displayDate(value) {
@@ -94,6 +98,16 @@ async function init() {
     return;
   }
 
+  // Harmless readiness probe: the Phase 7 function validates the empty note
+  // before reading or changing a ticket. A missing RPC is the common setup issue.
+  const probe = await supabaseClient.rpc("admin_submit_ticket_resolution", {
+    target_ticket_id: "00000000-0000-0000-0000-000000000000",
+    target_resolution_note: "",
+    target_evidence_path: null
+  });
+  const probeMessage = probe.error?.message || "";
+  resolutionSchemaReady = !probe.error || !/schema cache|could not find (the )?function|PGRST202/i.test(probeMessage);
+
   document.querySelectorAll(".switcher [data-l]").forEach((button) => {
     button.addEventListener("click", () => {
       document.body.dataset.layout = button.dataset.l;
@@ -118,13 +132,13 @@ async function init() {
   $(".switcher [data-act='refresh']").addEventListener("click", () => refreshData(false));
   $("#pill").addEventListener("click", showNewTickets);
 
-  $("#fs").innerHTML += Object.entries(STATUS).map(([value, label]) =>
+  $("#fs").innerHTML += Object.entries(STATUS).filter(([value]) => value !== "resolved").map(([value, label]) =>
     `<option value="${value}">${label}</option>`).join("");
   $("#fc").innerHTML += Object.entries(CATEGORY).map(([value, label]) =>
     `<option value="${value}">${escapeHtml(label)}</option>`).join("");
   $("#ba").innerHTML = '<option value="">Assign selected…</option><option value="_">Unassigned</option>';
   $("#bs").innerHTML = '<option value="">Set status…</option>'
-    + Object.entries(STATUS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    + Object.entries(STAFF_STATUS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
   $(".switcher").insertAdjacentHTML("afterbegin", '<i class="slider" aria-hidden="true"></i>');
   await refreshData(false);
   slideSwitcher();
@@ -162,7 +176,7 @@ async function refreshData(detectNew) {
   tickets = nextTickets;
   selected = new Set([...selected].filter((id) => tickets.some((ticket) => ticket.id === id)));
 
-  const [profileResult, statusResult, assignmentResult, duplicateResult] = await Promise.all([
+  const [profileResult, statusResult, assignmentResult, duplicateResult, resolutionResult] = await Promise.all([
     supabaseClient.from("profiles").select("id, full_name, role, college_email, registration_number"),
     supabaseClient.from("ticket_status_events")
       .select("id, ticket_id, old_status, new_status, created_at, changed_by")
@@ -170,7 +184,10 @@ async function refreshData(detectNew) {
     supabaseClient.from("ticket_assignment_events")
       .select("id, ticket_id, previous_assignee_id, new_assignee_id, changed_by, created_at")
       .order("created_at", { ascending: false }).limit(500),
-    supabaseClient.rpc("get_active_duplicate_ticket_groups")
+    supabaseClient.rpc("get_active_duplicate_ticket_groups"),
+    supabaseClient.from("ticket_resolution_events")
+      .select("id, ticket_id, event_type, resolution_note, evidence_path, reason, created_at, actor_id")
+      .order("created_at", { ascending: false }).limit(500)
   ]);
   if (profileResult.error) console.warn("Could not load profiles:", profileResult.error.message);
   profiles = new Map((profileResult.data || []).map((profile) => [profile.id, profile]));
@@ -178,6 +195,19 @@ async function refreshData(detectNew) {
     .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
   statusEvents = statusResult.data || [];
   assignmentEvents = assignmentResult.data || [];
+  resolutionEvents = resolutionResult.data || [];
+  resolutionSchemaReady = resolutionSchemaReady && !resolutionResult.error;
+  const setupWarning = $("#setup-warning");
+  setupWarning.hidden = resolutionSchemaReady;
+  if (!resolutionSchemaReady) {
+    setupWarning.textContent = "Completion submission is disabled because the Phase 7 Supabase migration is missing. Run phase7-resolution-confirmation.sql in Supabase SQL Editor, then refresh this page.";
+    console.warn("Could not load resolution events:", resolutionResult.error.message);
+  }
+  resolutionPhotoUrls = new Map();
+  await Promise.all([...new Set(resolutionEvents.map((event) => event.evidence_path).filter(Boolean))].map(async (path) => {
+    const { data } = await supabaseClient.storage.from("ticket-resolution-evidence").createSignedUrl(path, 300);
+    if (data?.signedUrl) resolutionPhotoUrls.set(path, data.signedUrl);
+  }));
   duplicateCounts = new Map();
   if (duplicateResult.error) console.warn("Could not load duplicate groups:", duplicateResult.error.message);
   else for (const group of duplicateResult.data || []) {
@@ -248,7 +278,7 @@ function render() {
   const filtered = tickets.filter((ticket) => {
     const searchable = [ticket.description, ticket.room_number, ticket.building, ticket.floor,
       profileName(ticket.student_id), CATEGORY[ticket.category] || ticket.category].join(" ").toLowerCase();
-    return (!status || ticket.status === status) && (!category || ticket.category === category)
+    return ticket.status !== "resolved" && (!status || ticket.status === status) && (!category || ticket.category === category)
       && (!building || ticket.building === building) && (!query || searchable.includes(query));
   });
   const sort = $("#so").value;
@@ -278,7 +308,7 @@ function renderTicket(ticket) {
     <label class="pick"><input type="checkbox" data-act="pick" aria-label="Select ticket" ${selected.has(ticket.id) ? "checked" : ""}></label>
     ${photo ? `<img src="${escapeHtml(photo)}" alt="Ticket photo" loading="lazy">` : '<div class="photo-empty">No photo</div>'}
     <div class="ticket-body"><div><strong>${escapeHtml(CATEGORY[ticket.category] || ticket.category)}</strong>
-      <span class="badge badge-${status}">${STATUS[status]}</span><span class="age ${isActive(ticket) && age > 48 * HOUR ? "late" : ""}">${ticket.status === "resolved" ? "Resolved" : elapsedLabel(ticket.created_at) + (isActive(ticket) ? " open" : "")}</span></div>
+      <span class="badge badge-${status}">${STATUS[status]}</span><span class="age ${isActive(ticket) && age > 48 * HOUR ? "late" : ""}">${ticket.status === "resolved" ? "Resolved" : ticket.status === "awaiting_confirmation" ? "Waiting for reporter" : elapsedLabel(ticket.created_at) + (isActive(ticket) ? " open" : "")}</span></div>
       <div class="ticket-meta">${escapeHtml(locationText(ticket))}</div>
       <div class="ticket-meta">Reported by: ${escapeHtml(profileName(ticket.student_id))}</div>
       ${reporter?.college_email ? `<div class="ticket-meta">SRM email: <a class="reporter-email" href="mailto:${escapeHtml(reporter.college_email)}">${escapeHtml(reporter.college_email)}</a></div>` : ""}
@@ -289,8 +319,10 @@ function renderTicket(ticket) {
       <div class="ticket-meta">Submitted ${escapeHtml(displayDate(ticket.created_at))}</div>
       ${duplicateCount > 1 ? `<div class="possible-duplicate">Potential duplicate · ${duplicateCount} active reports at this location</div>` : ""}
       <button class="ghost detail-button" data-act="details">Details & history</button>
+      ${["open", "in_progress"].includes(ticket.status) ? `<section class="resolution-form"><strong>Finish this job</strong><label for="resolution-note-${id}">What was fixed?</label><textarea id="resolution-note-${id}" data-resolution-note maxlength="1000" placeholder="Describe the repair or action taken (required)" ${resolutionSchemaReady ? "" : "disabled"}></textarea><label for="resolution-photo-${id}">After photo (optional)</label><input id="resolution-photo-${id}" data-resolution-photo type="file" accept="image/jpeg,image/png,image/webp" ${resolutionSchemaReady ? "" : "disabled"}><button data-act="submit-resolution" ${resolutionSchemaReady ? "" : "disabled"}>${resolutionSchemaReady ? "Submit for reporter confirmation" : "Apply Phase 7 migration to enable"}</button></section>` : ""}
+      ${resolutionEvents.filter((event) => event.ticket_id === ticket.id).map((event) => `<div class="resolution-note"><strong>${event.event_type === "submitted" ? "Staff completion note" : event.event_type === "confirmed" ? "Reporter confirmed" : "Reporter reopened"}</strong>${event.resolution_note ? `<p>${escapeHtml(event.resolution_note)}</p>` : ""}${event.reason ? `<p>Reason: ${escapeHtml(event.reason)}</p>` : ""}${event.evidence_path && resolutionPhotoUrls.has(event.evidence_path) ? `<a href="${escapeHtml(resolutionPhotoUrls.get(event.evidence_path))}" target="_blank" rel="noopener">View after photo</a>` : ""}</div>`).join("")}
       <label class="assignment-label" for="status-${id}">Ticket status</label>
-      <select id="status-${id}" data-act="status">${Object.entries(STATUS).map(([value, label]) =>
+      <select id="status-${id}" data-act="status">${status in STAFF_STATUS ? "" : `<option value="${status}" selected disabled>${STATUS[status] || status}</option>`}${Object.entries(STAFF_STATUS).map(([value, label]) =>
         `<option value="${value}" ${status === value ? "selected" : ""}>${label}</option>`).join("")}</select>
       <label class="assignment-label" for="assignee-${id}">Assign maintenance staff</label>
       <select id="assignee-${id}" data-act="assign"><option value="">Unassigned</option>${staff.map((person) =>
@@ -312,6 +344,11 @@ function renderDrawer(ticketId) {
       at: event.created_at,
       text: `Assigned to ${profileName(event.new_assignee_id, "Unassigned")}`
         + (event.changed_by ? ` · ${profileName(event.changed_by, "Staff")}` : "")
+    })),
+    ...resolutionEvents.filter((event) => event.ticket_id === ticketId).map((event) => ({
+      at: event.created_at,
+      text: `${event.event_type === "submitted" ? "Staff submitted completion" : event.event_type === "confirmed" ? "Reporter confirmed resolution" : "Reporter reopened ticket"}`
+        + (event.resolution_note ? `: ${event.resolution_note}` : "") + (event.reason ? ` · Reason: ${event.reason}` : "")
     }))
   ].sort((a, b) => new Date(a.at) - new Date(b.at));
   const photo = safePhotoUrl(ticket.photo_url);
@@ -333,8 +370,8 @@ function closeDrawer() {
 }
 
 async function changeStatus(ticketId, newStatus) {
-  if (!STATUS[newStatus]) return;
-  const { error } = await supabaseClient.from("tickets").update({ status: newStatus }).eq("id", ticketId);
+  if (!STAFF_STATUS[newStatus]) return;
+  const { error } = await supabaseClient.rpc("admin_set_ticket_status", { target_ticket_id: ticketId, target_status: newStatus });
   if (error) return toast(`Could not update status: ${error.message}`, true);
   toast(`Status changed to ${STATUS[newStatus]}`);
   await refreshData(false);
@@ -355,7 +392,8 @@ async function bulkStatus(event) {
   event.target.value = "";
   if (!value || !selected.size) return;
   const ids = [...selected];
-  const results = await Promise.all(ids.map((id) => supabaseClient.from("tickets").update({ status: value }).eq("id", id)));
+  if (!STAFF_STATUS[value]) return;
+  const results = await Promise.all(ids.map((id) => supabaseClient.rpc("admin_set_ticket_status", { target_ticket_id: id, target_status: value })));
   const failures = results.filter((result) => result.error);
   selected.clear();
   toast(failures.length ? `${failures.length} of ${ids.length} status updates failed` : `${ids.length} tickets set to ${STATUS[value]}`, failures.length > 0);
@@ -385,8 +423,45 @@ function handleClick(event) {
     renderDrawer(ticketId);
   } else if (action === "close") closeDrawer();
   else if (action === "logout") logout();
+  else if (action === "submit-resolution" && ticketId) submitResolution(ticketId);
   else if (action === "clearsel") {
     selected.clear(); render();
+  }
+}
+
+async function submitResolution(ticketId) {
+  const card = document.querySelector(`[data-id="${CSS.escape(ticketId)}"]`);
+  const noteInput = card?.querySelector("[data-resolution-note]");
+  const photoInput = card?.querySelector("[data-resolution-photo]");
+  const note = noteInput?.value.trim() || "";
+  if (note.length < 5) return toast("Add a completion note (at least 5 characters).", true);
+  const button = card.querySelector('[data-act="submit-resolution"]');
+  button.disabled = true;
+  let evidencePath = null;
+  try {
+    const file = photoInput?.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) throw new Error("Choose an image under 5 MB.");
+      evidencePath = `${ticketId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error: uploadError } = await supabaseClient.storage.from("ticket-resolution-evidence").upload(evidencePath, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+    }
+    const { error } = await supabaseClient.rpc("admin_submit_ticket_resolution", {
+      target_ticket_id: ticketId, target_resolution_note: note, target_evidence_path: evidencePath
+    });
+    if (error) throw error;
+    toast("Sent to the reporter for confirmation.");
+    await refreshData(false);
+  } catch (error) {
+    if (evidencePath) await supabaseClient.storage.from("ticket-resolution-evidence").remove([evidencePath]);
+    const detail = error.message || "Unknown error";
+    const message = /admin_submit_ticket_resolution|schema cache|ticket_resolution_events/i.test(detail)
+      ? "Completion needs the Phase 7 Supabase migration. Run phase7-resolution-confirmation.sql, then refresh."
+      : /bucket not found|ticket-resolution-evidence/i.test(detail)
+        ? "The private evidence bucket is missing. Run the Phase 7 Supabase migration, then retry."
+        : `Could not submit completion: ${detail}`;
+    toast(message, true);
+    button.disabled = false;
   }
 }
 

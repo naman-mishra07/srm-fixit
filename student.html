@@ -91,9 +91,11 @@ select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid va
 .badge{display:inline-block;margin-left:10px;padding:2px 12px;border-radius:999px;font-size:13.5px;font-weight:700;vertical-align:6px}
 .badge-open{background:var(--red);color:#fff}.badge-in_progress{background:var(--yellow)}
 .badge-resolved{background:var(--blue)}.badge-rejected{background:#E8E3D6;color:var(--muted)}
+.badge-awaiting_confirmation{background:var(--yellow-soft);color:#7a5c05}
 .age{margin-left:8px;font-size:13px;font-weight:600;color:var(--muted);vertical-align:6px}
 .age.late{color:#fff;background:var(--red);padding:1px 9px;border-radius:99px}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.resolution-note{display:grid;gap:5px;margin-top:10px;padding:12px;background:var(--yellow-soft);border-radius:12px}.resolution-note p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.resolution-note a{color:var(--blue-deep);font-weight:700}
 .empty{color:var(--muted);padding:6px 0}
 body[data-layout=gallery] #ticketList{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
 body[data-layout=gallery] .ticket{flex-direction:column;gap:0;padding:0;overflow:hidden;border-left-width:1px;border-top:6px solid var(--line)}
@@ -219,12 +221,12 @@ select[data-dd]{display:none}
 const $=s=>document.querySelector(s),H=36e5;
 const CAT={wifi:"WiFi",furniture:"Furniture",ac:"AC",electrical:"Electrical",smartboards_mics:"Smartboards & Mics",plumbing:"Plumbing",cleaning:"Cleaning"};
 const ICON={wifi:"📶",furniture:"🪑",ac:"❄️",electrical:"💡",smartboards_mics:"🎤",plumbing:"🚰",cleaning:"🧹"};
-const ST={open:"Open",in_progress:"In Progress",resolved:"Resolved",rejected:"Rejected"};
-const STC={open:"#C73532",in_progress:"#F3D77B",resolved:"#AFCDE0",rejected:"#c9c3b5"};
-let uid=null,tickets=[],events=[],shown=new Set(),prevSt={},fresh=new Set(),openId=null,first=true,loaded=false,showAll=false,pv=[];
+const ST={open:"Open",in_progress:"In Progress",awaiting_confirmation:"Awaiting Confirmation",resolved:"Resolved",rejected:"Rejected"};
+const STC={open:"#C73532",in_progress:"#F3D77B",awaiting_confirmation:"#F3D77B",resolved:"#AFCDE0",rejected:"#c9c3b5"};
+let uid=null,tickets=[],events=[],resolutionEvents=[],resolutionPhotoUrls=new Map(),shown=new Set(),prevSt={},fresh=new Set(),openId=null,first=true,loaded=false,showAll=false,pv=[];
 const RM=matchMedia("(prefers-reduced-motion: reduce)").matches,anim=(el,k,o)=>RM||!el?0:el.animate(k,o);
 const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const active=t=>t.status==="open"||t.status==="in_progress";
+const active=t=>t.status==="open"||t.status==="in_progress"||t.status==="awaiting_confirmation";
 const loc=t=>`${t.building}, ${t.floor}${t.is_common_area?" (Common Area)":", Room "+(t.room_number||"-")}`;
 const when=x=>new Date(x).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 const fmt=ms=>{const h=Math.floor(ms/H);return h<1?"<1h":h<48?h+"h":Math.floor(h/24)+"d "+h%24+"h"};
@@ -257,20 +259,26 @@ $("#saveContact").addEventListener("click",async()=>{
   finally{button.disabled=false;button.textContent="Save contact details"}
 });
 async function reload(){
-  const [t,e]=await Promise.all([
+  const [t,e,r]=await Promise.all([
     supabaseClient.from("tickets").select("*").eq("student_id",uid).order("created_at",{ascending:false}),
-    supabaseClient.from("ticket_status_events").select("id, ticket_id, old_status, new_status, created_at, tickets(category, building, floor, room_number, is_common_area)").eq("student_id",uid).order("created_at",{ascending:false}).limit(50)]);
+    supabaseClient.from("ticket_status_events").select("id, ticket_id, old_status, new_status, created_at, tickets(category, building, floor, room_number, is_common_area)").eq("student_id",uid).order("created_at",{ascending:false}).limit(50),
+    supabaseClient.from("ticket_resolution_events").select("id, ticket_id, event_type, resolution_note, evidence_path, reason, created_at, actor_id").order("created_at",{ascending:false}).limit(100)]);
   if(t.error){$("#ticketList").innerHTML=`<p class="error">Couldn't load tickets: ${esc(t.error.message)}</p>`;return}
   if(e.error)$("#statusUpdates").innerHTML=`<p class="error">Couldn't load updates: ${esc(e.error.message)}</p>`;
   if(loaded)t.data.forEach(x=>{if(!shown.has(x.id))fresh.add(x.id)});
-  tickets=t.data;events=e.data||[];loaded=true;view()}
+  tickets=t.data;events=e.data||[];resolutionEvents=r.data||[];
+  resolutionPhotoUrls=new Map();
+  await Promise.all([...new Set(resolutionEvents.map(x=>x.evidence_path).filter(Boolean))].map(async path=>{const {data}=await supabaseClient.storage.from("ticket-resolution-evidence").createSignedUrl(path,300);if(data?.signedUrl)resolutionPhotoUrls.set(path,data.signedUrl)}));
+  loaded=true;view()}
 
 /* ---- render ---- */
-function card(t){const r=resolvedIn(t),late=active(t)&&ageOf(t)>48*H;
+function card(t){const r=resolvedIn(t),late=active(t)&&ageOf(t)>48*H,latest=resolutionEvents.find(x=>x.ticket_id===t.id&&x.event_type==="submitted");
   return `<article class="ticket" data-id="${t.id}"><img src="${esc(t.photo_url)}" alt="Photo of the reported issue" loading="lazy"><div class="ticket-body">
   <div><strong>${esc(CAT[t.category]||t.category)}</strong><span class="badge badge-${esc(t.status)}">${esc(ST[t.status]||t.status)}</span><span class="age ${late?"late":""}">${r!=null?"Resolved in "+fmt(r):active(t)?fmt(ageOf(t))+" open":""}</span></div>
   <div class="ticket-meta">${esc(loc(t))}</div>${t.description?`<div class="ticket-meta">${esc(t.description)}</div>`:""}
   <div class="ticket-meta">Submitted ${when(t.created_at)}</div>
+  ${latest?`<section class="resolution-note"><strong>Staff completion note</strong><p>${esc(latest.resolution_note||"")}</p>${latest.evidence_path&&resolutionPhotoUrls.has(latest.evidence_path)?`<a href="${esc(resolutionPhotoUrls.get(latest.evidence_path))}" target="_blank" rel="noopener">View after photo</a>`:""}</section>`:""}
+  ${t.status==="awaiting_confirmation"?`<div class="row"><button data-act="confirm-resolution">Confirm fixed</button><button class="ghost" data-act="reopen-resolution">Reopen issue</button></div>`:""}
   <div class="row"><button class="ghost" data-act="open">Details</button></div></div></article>`}
 function view0(){const q=$("#q").value.toLowerCase(),fs=$("#fs").value,so=$("#so").value;
   const L=tickets.filter(t=>(!fs||t.status===fs)&&(!q||[t.description,t.room_number,t.building,t.floor,CAT[t.category]].join(" ").toLowerCase().includes(q)))
@@ -289,8 +297,10 @@ function drawer(id,keep){const t=tickets.find(x=>x.id===id);if(!t)return;openId=
   <h3 style="font:400 22px var(--display);letter-spacing:.03em;margin:8px 0 0">Timeline</h3><ul class="tl">${tl.map((e,i)=>`<li style="--k:${i}">${esc(e.txt)}<small>${when(e.t)}</small></li>`).join("")}</ul>`;
   $("#drawer").classList.add("open");$("#scrim").classList.add("on")}
 function closeDrawer(){openId=null;$("#drawer").classList.remove("open");$("#scrim").classList.remove("on")}
-document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(e.target.id==="scrim")return closeDrawer();if(!el)return;const a=el.dataset.act;
-  if(a==="open")drawer(el.closest("[data-id]").dataset.id);else if(a==="close")closeDrawer();else if(a==="more"){showAll=!showAll;view()}});
+document.addEventListener("click",async e=>{const el=e.target.closest("[data-act]");if(e.target.id==="scrim")return closeDrawer();if(!el)return;const a=el.dataset.act,id=el.closest("[data-id]")?.dataset.id;
+  if(a==="open")drawer(id);else if(a==="close")closeDrawer();else if(a==="more"){showAll=!showAll;view()}
+  else if(a==="confirm-resolution"&&id){if(!confirm("Confirm that this issue has been fixed?"))return;const {error}=await supabaseClient.rpc("student_confirm_ticket_resolution",{target_ticket_id:id});if(error)toast(error.message);else{toast("Thanks for confirming the repair.");await reload()}}
+  else if(a==="reopen-resolution"&&id){const reason=prompt("What still needs attention? (At least 5 characters)");if(reason===null)return;const {error}=await supabaseClient.rpc("student_reopen_ticket_resolution",{target_ticket_id:id,reopen_reason:reason});if(error)toast(error.message);else{toast("Ticket reopened for staff.");await reload()}}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
 ["q","so","fs"].forEach(i=>$("#"+i).addEventListener(i==="q"?"input":"change",view));
 $("#fs").innerHTML+=Object.entries(ST).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");

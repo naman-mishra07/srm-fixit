@@ -66,6 +66,7 @@ select{font:inherit;color:var(--ink);background-color:var(--paper);border:1px so
 .badge-in_progress{background:var(--yellow);color:var(--ink)}
 .badge-resolved{background:var(--blue);color:var(--ink)}
 .badge-rejected{background:#E8E3D6;color:var(--muted)}
+.badge-awaiting_confirmation{background:var(--yellow-soft);color:var(--yellow-deep)}
 .possible-duplicate{margin-top:6px;align-self:flex-start;background:var(--red-soft);color:#9c2422;font-size:13px;font-weight:700;padding:4px 12px;border-radius:999px}
 .assignment-label{margin-top:10px;font-size:13px;font-weight:700;color:var(--muted)}
 .ticket-body select{margin-top:4px;align-self:flex-start;min-width:200px;max-width:100%}
@@ -134,6 +135,14 @@ button.red{background:var(--red);color:#fff}
 .empty,.error{color:var(--muted)}
 .error{color:var(--red)}
 .ticket-meta.description{overflow-wrap:anywhere}
+.resolution-form,.resolution-note{display:grid;gap:7px;margin-top:10px;padding:12px;background:var(--yellow-soft);border-radius:12px}
+.resolution-form label{font-size:13px;font-weight:700;color:var(--muted)}
+.resolution-form textarea{width:100%;min-height:72px;resize:vertical;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--paper);color:var(--ink)}
+.resolution-form input[type=file]{font:inherit;max-width:100%}
+.resolution-form button{justify-self:start}
+.setup-warning{padding:12px 14px;margin:0 0 14px;border-radius:12px;background:var(--yellow-soft);color:var(--yellow-deep);font-weight:600}
+.resolution-note p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.resolution-note a{color:var(--blue-deep);font-weight:700}
 #toast.error-toast{background:#9c2422}
 #toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translate(-50%,-140%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;z-index:30;transition:transform .25s;max-width:calc(100% - 24px);font-size:14px}
 #toast.on{transform:translate(-50%,0)}
@@ -225,10 +234,12 @@ body[data-layout=gallery] .ticket-body .dd{width:100%;min-width:0;align-self:str
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
 </style></head><body data-layout="list">
 <div class="top-bar"><h1>Admin Dashboard</h1><div class="topbar-actions">
+  <button class="secondary" onclick="window.location.href='archive.html'">Resolved archive</button>
   <button class="secondary" onclick="window.location.href='index.html'">Back to options</button>
   <button class="secondary" data-act="logout">Log Out</button>
 </div></div>
 <button id="pill" data-act="pill"></button>
+<p id="setup-warning" class="setup-warning" role="alert" hidden></p>
 <section class="card"><h2>Ticket Analytics</h2><div id="an"></div></section>
 <div class="filters">
   <input id="q" type="search" placeholder="Search description, room, reporter" aria-label="Search tickets">
@@ -249,4 +260,4 @@ body[data-layout=gallery] .ticket-body .dd{width:100%;min-width:0;align-self:str
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="pwa-install.js"></script>
-<script src="admin.js"></script></body></html>
+<script src="admin.js?v=phase7-archive-3"></script></body></html>
