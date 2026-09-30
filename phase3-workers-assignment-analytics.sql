@@ -133,7 +133,11 @@ begin
     end if;
 
     update public.tickets
-    set assigned_to = target_staff_id
+    set assigned_to = target_staff_id,
+        status = case
+            when target_staff_id is not null and status = 'open' then 'in_progress'
+            else status
+        end
     where id = target_ticket_id;
 
     if not found then

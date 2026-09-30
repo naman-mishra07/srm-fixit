@@ -123,29 +123,47 @@ app.post("/api/auth/srm", authLimiter, accountLimiter, async (req, res) => {
       return res.status(401).json({ error: "SRM sign in failed. Check your email and password." });
     }
 
-    // Mint a one-time FixIt session after SRM verifies the account.
-    // The Supabase service key never leaves this server.
-    const accountLink = await adminClient.auth.admin.generateLink({ type: "magiclink", email });
-    if (accountLink.error || !accountLink.data?.user?.id) {
-      return res.status(403).json({ error: "SRM verified, but this account is not enabled in FixIt. Contact the administrator." });
+    // Provision a FixIt auth identity only after Academia has verified the
+    // credentials. Public Supabase signups can stay disabled; the service key
+    // is used only on this server and never reaches the browser.
+    let accountLink = await adminClient.auth.admin.generateLink({ type: "magiclink", email });
+    let accountUser = accountLink.data?.user;
+    if (!accountUser?.id) {
+      const displayName = email.slice(0, email.indexOf("@")).trim().slice(0, 120);
+      const { data: createdAccount } = await adminClient.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { full_name: displayName }
+      });
+      accountUser = createdAccount?.user;
+
+      // A concurrent first login may have created the same auth user already.
+      if (!accountUser?.id) {
+        accountLink = await adminClient.auth.admin.generateLink({ type: "magiclink", email });
+        accountUser = accountLink.data?.user;
+      }
+    }
+    if (!accountUser?.id) {
+      return res.status(503).json({ error: "SRM verified, but FixIt could not provision this account. Contact the administrator." });
     }
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
       .select("role")
-      .eq("id", accountLink.data.user.id)
+      .eq("id", accountUser.id)
       .maybeSingle();
     if (profileError) {
       return res.status(503).json({ error: "FixIt could not check account access. Contact the administrator." });
     }
     if (!profile) {
-      const displayName = String(accountLink.data.user.user_metadata?.full_name
-        || accountLink.data.user.user_metadata?.name
+      const displayName = String(accountUser.user_metadata?.full_name
+        || accountUser.user_metadata?.name
         || email.slice(0, email.indexOf("@"))).trim().slice(0, 120);
       const { error: createProfileError } = await adminClient.from("profiles").insert({
-        id: accountLink.data.user.id,
+        id: accountUser.id,
         full_name: displayName,
-        role: "student"
+        role: "student",
+        college_email: email
       });
       if (createProfileError) {
         return res.status(503).json({ error: "Your SRM account was verified, but FixIt could not create your profile. Contact the administrator." });
@@ -154,9 +172,15 @@ app.post("/api/auth/srm", authLimiter, accountLimiter, async (req, res) => {
       return res.status(403).json({ error: "SRM verified, but this account is not enabled in FixIt. Contact the administrator." });
     }
 
-    const { error: metadataError } = await adminClient.auth.admin.updateUserById(accountLink.data.user.id, {
+    const { error: emailUpdateError } = await adminClient.from("profiles")
+      .update({ college_email: email }).eq("id", accountUser.id);
+    if (emailUpdateError) {
+      return res.status(503).json({ error: "FixIt could not save your verified SRM email. Contact the administrator." });
+    }
+
+    const { error: metadataError } = await adminClient.auth.admin.updateUserById(accountUser.id, {
       app_metadata: {
-        ...accountLink.data.user.app_metadata,
+        ...accountUser.app_metadata,
         srm_academia_verified_at: Date.now()
       }
     });
@@ -172,6 +196,43 @@ app.post("/api/auth/srm", authLimiter, accountLimiter, async (req, res) => {
   } catch {
     // Never log request bodies, passwords, Academia cookies, or third-party error objects.
     res.status(502).json({ error: "SRM sign in is temporarily unavailable. Try again shortly." });
+  }
+});
+
+app.patch("/api/profile/registration-number", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (!adminClient) return res.status(503).json({ error: "Profile updates are not configured on this server." });
+
+  const authorization = req.get("authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  if (!match) return res.status(401).json({ error: "Sign in again to update your profile." });
+
+  try {
+    const { data: { user }, error: userError } = await adminClient.auth.getUser(match[1]);
+    const email = user?.email?.trim().toLowerCase() || "";
+    const verifiedAt = Number(user?.app_metadata?.srm_academia_verified_at);
+    const verifiedRecently = verifiedAt && Date.now() - verifiedAt <= 12 * 60 * 60 * 1000
+      && verifiedAt <= Date.now() + 60_000;
+    if (userError || !user || !email.endsWith(srmDomain) || !verifiedRecently) {
+      return res.status(401).json({ error: "Your SRM session expired. Sign in again to update your profile." });
+    }
+
+    const registrationNumber = typeof req.body?.registration_number === "string"
+      ? req.body.registration_number.trim().toUpperCase() : "";
+    if (registrationNumber && !/^[A-Z0-9/-]{4,30}$/.test(registrationNumber)) {
+      return res.status(400).json({ error: "Enter a valid SRM registration number (4–30 letters, numbers, / or -)." });
+    }
+
+    const { data, error } = await adminClient.from("profiles")
+      .update({ college_email: email, registration_number: registrationNumber || null })
+      .eq("id", user.id).select("id").maybeSingle();
+    if (error?.code === "23505") {
+      return res.status(409).json({ error: "That registration number is already linked to another FixIt account." });
+    }
+    if (error || !data) return res.status(503).json({ error: "Could not save your profile details. Try again shortly." });
+    res.json({ ok: true, registration_number: registrationNumber || null });
+  } catch {
+    res.status(503).json({ error: "Could not save your profile details. Try again shortly." });
   }
 });
 

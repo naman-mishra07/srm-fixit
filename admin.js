@@ -73,6 +73,14 @@ function profileName(id, fallback = "Unknown") {
   return id ? profiles.get(id)?.full_name || fallback : fallback;
 }
 
+function resolutionEmailLink(ticket) {
+  const profile = profiles.get(ticket.student_id);
+  if (!profile?.college_email || ticket.status !== "resolved") return "";
+  const subject = "SRM-FixIt: Your maintenance issue has been resolved";
+  const body = `Hello ${profile.full_name || "there"},\n\nYour ${CATEGORY[ticket.category] || ticket.category} issue at ${locationText(ticket)} has been marked as resolved.\n\nRegards,\nSRM-FixIt Maintenance Team`;
+  return `mailto:${encodeURIComponent(profile.college_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 async function init() {
   const session = await requireAuth();
   if (!session) return;
@@ -155,7 +163,7 @@ async function refreshData(detectNew) {
   selected = new Set([...selected].filter((id) => tickets.some((ticket) => ticket.id === id)));
 
   const [profileResult, statusResult, assignmentResult, duplicateResult] = await Promise.all([
-    supabaseClient.from("profiles").select("id, full_name, role"),
+    supabaseClient.from("profiles").select("id, full_name, role, college_email, registration_number"),
     supabaseClient.from("ticket_status_events")
       .select("id, ticket_id, old_status, new_status, created_at, changed_by")
       .order("created_at", { ascending: false }).limit(500),
@@ -263,6 +271,8 @@ function renderTicket(ticket) {
   const age = Date.now() - new Date(ticket.created_at).getTime();
   const duplicateCount = duplicateCounts.get(ticket.id) || 0;
   const photo = safePhotoUrl(ticket.photo_url);
+  const reporter = profiles.get(ticket.student_id);
+  const emailLink = resolutionEmailLink(ticket);
   const id = escapeHtml(ticket.id);
   return `<article class="ticket ${freshIds.has(ticket.id) ? "fresh" : ""}" data-id="${id}">
     <label class="pick"><input type="checkbox" data-act="pick" aria-label="Select ticket" ${selected.has(ticket.id) ? "checked" : ""}></label>
@@ -271,6 +281,9 @@ function renderTicket(ticket) {
       <span class="badge badge-${status}">${STATUS[status]}</span><span class="age ${isActive(ticket) && age > 48 * HOUR ? "late" : ""}">${ticket.status === "resolved" ? "Resolved" : elapsedLabel(ticket.created_at) + (isActive(ticket) ? " open" : "")}</span></div>
       <div class="ticket-meta">${escapeHtml(locationText(ticket))}</div>
       <div class="ticket-meta">Reported by: ${escapeHtml(profileName(ticket.student_id))}</div>
+      ${reporter?.college_email ? `<div class="ticket-meta">SRM email: <a class="reporter-email" href="mailto:${escapeHtml(reporter.college_email)}">${escapeHtml(reporter.college_email)}</a></div>` : ""}
+      ${reporter?.registration_number ? `<div class="ticket-meta">Student registration number: ${escapeHtml(reporter.registration_number)}</div>` : ""}
+      ${emailLink ? `<a class="resolution-email" href="${escapeHtml(emailLink)}">Draft resolution email</a>` : ""}
       <div class="ticket-meta">Assigned to: ${escapeHtml(profileName(ticket.assigned_to, "Unassigned"))}</div>
       ${ticket.description ? `<div class="ticket-meta description">${escapeHtml(ticket.description)}</div>` : ""}
       <div class="ticket-meta">Submitted ${escapeHtml(displayDate(ticket.created_at))}</div>
